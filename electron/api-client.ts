@@ -24,6 +24,55 @@ type AuthResponse = {
   user: PublicSession['user']
 }
 
+type ApiEnvelope<T> = {
+  success?: boolean
+  message?: string
+  data?: T
+  error?: { message?: string }
+}
+
+function unwrap<T>(value: unknown): T {
+  if (value && typeof value === 'object' && 'success' in value) {
+    const envelope = value as ApiEnvelope<T>
+    if (envelope.success === false) {
+      throw new Error(envelope.error?.message ?? envelope.message ?? 'Falha na API')
+    }
+    return envelope.data as T
+  }
+  return value as T
+}
+
+function normalizeAuth(value: unknown): AuthResponse {
+  const data = unwrap<Record<string, unknown>>(value)
+  const accessToken = String(data.accessToken ?? data.access_token ?? data.token ?? '')
+  const refreshToken = String(data.refreshToken ?? data.refresh_token ?? '')
+  const expiresIn = Number(data.expiresIn ?? data.expires_in ?? 3600)
+  const rawUser = (data.user ?? {}) as Record<string, unknown>
+  if (!accessToken || !refreshToken || !rawUser.id) {
+    throw new Error('Resposta de autenticação inválida')
+  }
+  return {
+    accessToken,
+    refreshToken,
+    expiresAt: data.expiresAt
+      ? String(data.expiresAt)
+      : new Date(Date.now() + expiresIn * 1000).toISOString(),
+    user: {
+      id: String(rawUser.id),
+      name: String(rawUser.name ?? rawUser.nome ?? rawUser.email ?? 'Usuário'),
+      email: String(rawUser.email ?? ''),
+      companyId: rawUser.companyId
+        ? String(rawUser.companyId)
+        : rawUser.empresaId ? String(rawUser.empresaId) : undefined,
+      role: rawUser.role ? String(rawUser.role) : undefined,
+      avatarUrl: rawUser.avatarUrl ? String(rawUser.avatarUrl) : undefined,
+      permissions: Array.isArray(rawUser.permissions)
+        ? rawUser.permissions.map(String)
+        : [],
+    },
+  }
+}
+
 async function fetchJson(
   path: string,
   init: RequestInit,
@@ -60,7 +109,7 @@ async function refresh(): Promise<boolean> {
       await clearSession()
       return false
     }
-    const next = (await response.json()) as AuthResponse
+    const next = normalizeAuth(await response.json())
     await saveSession({ ...next, version: 1 })
     return true
   })().finally(() => {
@@ -75,7 +124,7 @@ export async function login(input: LoginInput): Promise<PublicSession> {
     body: JSON.stringify(input),
   })
   if (!response.ok) throw new Error('Não foi possível autenticar')
-  const session = (await response.json()) as AuthResponse
+  const session = normalizeAuth(await response.json())
   await saveSession({ ...session, version: 1 })
   return toPublicSession({ ...session, version: 1 })
 }
@@ -94,7 +143,13 @@ export async function logout(): Promise<void> {
 
 export async function publicSession(): Promise<PublicSession | null> {
   const session = await loadSession()
-  return session ? toPublicSession(session) : null
+  if (!session) return null
+  if (new Date(session.expiresAt).getTime() <= Date.now()) {
+    if (!await refresh()) return null
+    const renewed = await loadSession()
+    return renewed ? toPublicSession(renewed) : null
+  }
+  return toPublicSession(session)
 }
 
 export async function apiRequest(
@@ -118,10 +173,22 @@ export async function apiRequest(
   }
   const body = (await response.json().catch(() => null)) as unknown
   if (!response.ok) {
-    throw new Error(`API indisponível (${response.status})`)
+    const envelope = body as ApiEnvelope<unknown> | null
+    const fallback: Record<number, string> = {
+      401: 'Sua sessão expirou. Entre novamente.',
+      403: 'Seu perfil não possui permissão para esta operação.',
+      422: 'Revise os campos informados.',
+      429: 'Muitas solicitações. Aguarde e tente novamente.',
+    }
+    throw new Error(
+      envelope?.error?.message ??
+      envelope?.message ??
+      fallback[response.status] ??
+      `API indisponível (${response.status})`,
+    )
   }
   return {
-    data: body,
+    data: unwrap(body),
     status: response.status,
     requestId: response.headers.get('x-request-id') ?? undefined,
   }

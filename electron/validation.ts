@@ -13,6 +13,8 @@ const allowedRoots = [
   '/automation/',
   '/analytics/',
   '/integrations/',
+  '/organizacao/',
+  '/audit/',
   '/health',
 ]
 

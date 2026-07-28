@@ -3,6 +3,8 @@ export type PublicUser = {
   name?: string
   email: string
   companyId?: string
+  role?: string
+  avatarUrl?: string
   permissions: string[]
 }
 

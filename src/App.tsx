@@ -1,26 +1,36 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { FormEvent } from 'react'
 import {
-  BarChart3,
-  Bell,
-  CheckCircle2,
-  ChevronLeft,
-  CircleDollarSign,
-  GitBranch,
-  LayoutDashboard,
-  Menu,
-  Search,
-  Settings,
-  Target,
-  UsersRound,
-  X,
+  BarChart3, Bell, CheckCircle2, ChevronLeft, CircleDollarSign, GitBranch,
+  LayoutDashboard, LogOut, Menu, RefreshCw, Search, Settings, Target,
+  UsersRound, X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import type { PublicSession } from '../electron/contracts'
+import {
+  apiConfiguration,
+  apiHealth,
+  apiRequest,
+  authApi,
+  mutationKey,
+  SESSION_EXPIRED_EVENT,
+} from './api'
 import './App.css'
 
-type Section = {
-  id: string
-  label: string
-  icon: LucideIcon
+type Section = { id: string; label: string; icon: LucideIcon }
+type Row = Record<string, unknown>
+type Page<T> = { items: T[]; page: number; total: number; totalPages: number }
+type Central = {
+  metrics: {
+    accounts: number; contacts: number; openDeals: number; wonDeals: number
+    lostDeals: number; pendingActivities: number; overdueActivities: number
+    pipelineValueCents: number
+  }
+  recentDeals: Row[]
+  nextActivities: Row[]
+}
+type Analytics = {
+  crm: Row[]; imobiliario: Row[]; vendas: Row[]; tarefas: Row[]; generatedAt: string
 }
 
 const sections: Section[] = [
@@ -31,264 +41,199 @@ const sections: Section[] = [
   { id: 'relatorios', label: 'Relatórios', icon: BarChart3 },
 ]
 
-const metrics = [
-  {
-    label: 'Novos contatos',
-    value: '1.245',
-    growth: '+12.5%',
-    icon: UsersRound,
-  },
-  {
-    label: 'Deals fechados',
-    value: '86',
-    growth: '+8.2%',
-    icon: CheckCircle2,
-  },
-  {
-    label: 'Tarefas concluídas',
-    value: '234',
-    growth: '+15.3%',
-    icon: Target,
-  },
-  {
-    label: 'Receita gerada',
-    value: 'R$ 890k',
-    growth: '+21.7%',
-    icon: CircleDollarSign,
-  },
-]
+const endpoints: Record<string, string> = {
+  leads: '/crm/accounts',
+  oportunidades: '/crm/deals',
+  fluxo: '/crm/activities',
+}
 
-const sellers = [
-  ['Marina Costa', '42', 'R$ 184.500'],
-  ['Lucas Almeida', '36', 'R$ 152.300'],
-  ['Carla Mendes', '31', 'R$ 138.900'],
-  ['Rafael Souza', '28', 'R$ 121.600'],
-]
+function initials(name?: string) {
+  return (name ?? 'RE').split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()
+}
+function asNumber(value: unknown) { return Number(value ?? 0) || 0 }
+function money(cents: unknown) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+    .format(asNumber(cents) / 100)
+}
+function date(value: unknown) {
+  if (!value) return '—'
+  const parsed = new Date(String(value))
+  return Number.isNaN(parsed.getTime()) ? '—' : parsed.toLocaleDateString('pt-BR')
+}
+function text(row: Row, ...keys: string[]) {
+  const key = keys.find((item) => row[item] !== undefined && row[item] !== null)
+  return key ? String(row[key]) : '—'
+}
 
-const statusItems = [
-  ['Novo', '34%', '#f5ce39'],
-  ['Nutrição', '22%', '#dab025'],
-  ['Oportunidade', '18%', '#9d7b13'],
-  ['Follow-up', '16%', '#765a0a'],
-  ['Fechado', '10%', '#4b3907'],
-]
+function useRemote<T>(load: () => Promise<T>, dependencies: unknown[]) {
+  const [data, setData] = useState<T | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [version, setVersion] = useState(0)
+  const reload = useCallback(() => setVersion((value) => value + 1), [])
+  useEffect(() => {
+    let current = true
+    setLoading(true)
+    setError('')
+    load().then((value) => current && setData(value))
+      .catch((reason: unknown) => current && setError(reason instanceof Error ? reason.message : 'Falha ao carregar'))
+      .finally(() => current && setLoading(false))
+    return () => { current = false }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [...dependencies, version])
+  return { data, loading, error, reload }
+}
 
 function Brand() {
-  return (
-    <div className="brand">
-      <div className="brand-mark">R</div>
-      <div>
-        <strong>Renan Reis</strong>
-        <span>CRM Pro</span>
-      </div>
-    </div>
-  )
+  return <div className="brand"><div className="brand-mark">R</div><div><strong>Renan Reis</strong><span>CRM Pro</span></div></div>
 }
 
-function PerformanceChart() {
-  const points =
-    '0,113 80,82 160,91 240,56 320,48 400,28 480,37 560,8 640,16 720,-4 800,-15 880,-42'
-  return (
-    <div className="chart-wrap" aria-label="Gráfico de performance dos últimos 12 meses">
-      <div className="y-axis">
-        <span>1000</span><span>750</span><span>500</span><span>250</span><span>0</span>
-      </div>
-      <div className="plot">
-        <svg viewBox="0 -55 880 180" preserveAspectRatio="none" role="img">
-          <defs>
-            <linearGradient id="performance-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor="#c99d0b" stopOpacity=".35" />
-              <stop offset="1" stopColor="#c99d0b" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          <path d={`M ${points} L880,125 L0,125 Z`} fill="url(#performance-fill)" />
-          <polyline points={points} fill="none" stroke="#d4a70e" strokeWidth="2.4" />
-        </svg>
-        <div className="x-axis">
-          {['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'].map(
-            (month) => <span key={month}>{month}</span>,
-          )}
-        </div>
-      </div>
-    </div>
-  )
+function StatePanel({ loading, error, onRetry }: { loading: boolean; error: string; onRetry: () => void }) {
+  if (loading) return <div className="state-panel"><RefreshCw className="spin" /><span>Buscando dados da API…</span></div>
+  if (error) return <div className="state-panel error"><strong>Não foi possível carregar</strong><span>{error}</span><button onClick={onRetry}>Tentar novamente</button></div>
+  return null
 }
 
-function Dashboard() {
-  return (
-    <>
-      <div className="page-heading">
-        <div>
-          <h1>Dashboard</h1>
-          <p>Visão geral de desempenho — Julho 2025</p>
-        </div>
-        <button className="period-button" type="button">Últimos 12 meses</button>
-      </div>
-
-      <section className="metrics-grid" aria-label="Indicadores principais">
-        {metrics.map(({ label, value, growth, icon: Icon }) => (
-          <article className="metric-card" key={label}>
-            <div className="metric-icon"><Icon size={23} /></div>
-            <div>
-              <span>{label}</span>
-              <strong>{value}</strong>
-              <small>↑ {growth} este mês</small>
-            </div>
-          </article>
-        ))}
-      </section>
-
-      <section className="dashboard-grid">
-        <article className="panel performance-panel">
-          <div className="panel-heading">
-            <h2>Performance Overview</h2>
-            <span>Últimos 12 meses</span>
-          </div>
-          <PerformanceChart />
-        </article>
-
-        <article className="panel status-panel">
-          <h2>Distribuição de Status</h2>
-          <div className="donut" aria-label="34% novo, 22% nutrição, 18% oportunidade, 16% follow-up, 10% fechado" />
-          <ul className="status-list">
-            {statusItems.map(([label, value, color]) => (
-              <li key={label}>
-                <span><i style={{ background: color }} />{label}</span>
-                <strong>{value}</strong>
-              </li>
-            ))}
-          </ul>
-        </article>
-
-        <article className="panel region-panel">
-          <h2>Vendas por Região</h2>
-          <div className="bars" aria-label="Gráfico de vendas por região">
-            {[72, 48, 91, 64, 84, 53, 77].map((height, index) => (
-              <div className="bar-column" key={height}>
-                <span style={{ height: `${height}%` }} />
-                <small>{['Sul', 'SE', 'NE', 'CO', 'N', 'Int.', 'Web'][index]}</small>
-              </div>
-            ))}
-          </div>
-        </article>
-
-        <article className="panel sellers-panel">
-          <div className="panel-heading">
-            <h2>Top Vendedores</h2>
-            <button type="button">Ver todos</button>
-          </div>
-          <table>
-            <thead><tr><th>Nome</th><th>Deals</th><th>Receita</th></tr></thead>
-            <tbody>
-              {sellers.map(([name, deals, revenue], index) => (
-                <tr key={name}>
-                  <td><i>{index + 1}</i>{name}</td><td>{deals}</td><td>{revenue}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </article>
-      </section>
-    </>
-  )
-}
-
-function ModulePage({ section }: { section: Section }) {
-  const Icon = section.icon
-  return (
-    <section className="module-page">
-      <div className="page-heading">
-        <div><h1>{section.label}</h1><p>Gerencie suas operações em um único lugar.</p></div>
-        <button className="gold-button" type="button">+ Novo registro</button>
-      </div>
-      <div className="module-card">
-        <div className="module-card-icon"><Icon size={30} /></div>
-        <div>
-          <h2>{section.label}</h2>
-          <p>Este módulo está preparado para receber os dados da API REIS.</p>
-        </div>
-      </div>
+function Dashboard({ refreshKey }: { refreshKey: number }) {
+  const central = useRemote(async () => (await apiRequest<Central>({ method: 'GET', path: '/crm/central' })).data, [refreshKey])
+  const analytics = useRemote(async () => (await apiRequest<Analytics>({ method: 'GET', path: '/analytics/dashboard' })).data, [refreshKey])
+  if (!central.data) return <StatePanel loading={central.loading} error={central.error} onRetry={central.reload} />
+  const metrics = central.data.metrics
+  const crm = analytics.data?.crm?.[0] ?? {}
+  const tasks = analytics.data?.tarefas?.[0] ?? {}
+  const cards = [
+    { label: 'Clientes', value: metrics.accounts, detail: `${metrics.contacts} contatos`, icon: UsersRound },
+    { label: 'Negócios ganhos', value: metrics.wonDeals, detail: `${metrics.openDeals} em aberto`, icon: CheckCircle2 },
+    { label: 'Tarefas concluídas', value: asNumber(tasks.concluidas), detail: `${metrics.pendingActivities} pendentes`, icon: Target },
+    { label: 'Pipeline', value: money(metrics.pipelineValueCents), detail: `${asNumber(crm.taxaConversao)}% de conversão`, icon: CircleDollarSign },
+  ]
+  return <>
+    <div className="page-heading"><div><h1>Dashboard</h1><p>Visão geral atualizada diretamente pela API REIS.</p></div><button className="period-button" onClick={() => { central.reload(); analytics.reload() }}><RefreshCw size={15} /> Atualizar</button></div>
+    {analytics.error && <div className="inline-warning">{analytics.error}</div>}
+    <section className="metrics-grid">
+      {cards.map(({ label, value, detail, icon: Icon }) => <article className="metric-card" key={label}><div className="metric-icon"><Icon size={23} /></div><div><span>{label}</span><strong>{value}</strong><small>{detail}</small></div></article>)}
     </section>
-  )
+    <section className="dashboard-grid">
+      <article className="panel performance-panel"><div className="panel-heading"><h2>Negócios recentes</h2><span>{central.data.recentDeals.length} registros</span></div><DataTable rows={central.data.recentDeals} kind="deals" compact /></article>
+      <article className="panel status-panel"><h2>Operação agora</h2><ul className="summary-list">
+        <li><span>Negócios abertos</span><strong>{metrics.openDeals}</strong></li>
+        <li><span>Negócios ganhos</span><strong>{metrics.wonDeals}</strong></li>
+        <li><span>Negócios perdidos</span><strong>{metrics.lostDeals}</strong></li>
+        <li><span>Tarefas vencidas</span><strong>{metrics.overdueActivities}</strong></li>
+      </ul></article>
+      <article className="panel sellers-panel wide-panel"><div className="panel-heading"><h2>Próximas atividades</h2><span>Agenda operacional</span></div><DataTable rows={central.data.nextActivities} kind="activities" compact /></article>
+    </section>
+  </>
+}
+
+function DataTable({ rows, kind, compact = false, onComplete }: { rows: Row[]; kind: string; compact?: boolean; onComplete?: (id: string) => void }) {
+  if (!rows.length) return <div className="empty">Nenhum registro encontrado.</div>
+  return <div className="table-scroll"><table className="data-table"><thead><tr>
+    <th>Nome</th><th>Status</th>{!compact && <th>{kind === 'deals' ? 'Valor' : 'Contato / Prazo'}</th>}{onComplete && <th />}
+  </tr></thead><tbody>{rows.map((row, index) => <tr key={String(row.id ?? index)}>
+    <td><strong>{text(row, 'nome', 'name', 'titulo', 'title')}</strong><small>{text(row, 'email', 'descricao', 'description')}</small></td>
+    <td><span className="status-chip">{text(row, 'status', 'etapa', 'stage')}</span></td>
+    {!compact && <td>{kind === 'deals' ? money(asNumber(row.valueCents ?? row.valor) * (row.valor ? 100 : 1)) : text(row, 'telefone', 'phone') !== '—' ? text(row, 'telefone', 'phone') : date(row.vencimento ?? row.dueAt)}</td>}
+    {onComplete && <td><button className="row-action" onClick={() => onComplete(String(row.id))}>Concluir</button></td>}
+  </tr>)}</tbody></table></div>
+}
+
+function ResourcePage({ section, search, refreshKey }: { section: Section; search: string; refreshKey: number }) {
+  const [page, setPage] = useState(1)
+  const [creating, setCreating] = useState(false)
+  const path = endpoints[section.id]
+  const query = new URLSearchParams({ page: String(page), limit: '20', ...(search ? { search } : {}) })
+  const remote = useRemote(async () => (await apiRequest<Page<Row>>({ method: 'GET', path: `${path}?${query}` })).data, [path, page, search, refreshKey])
+  const complete = async (id: string) => {
+    await apiRequest({ method: 'PATCH', path: `/crm/activities/${id}/complete`, body: {}, idempotencyKey: mutationKey() })
+    remote.reload()
+  }
+  return <section className="module-page">
+    <div className="page-heading"><div><h1>{section.label}</h1><p>{remote.data?.total ?? 0} registros encontrados na API.</p></div><button className="gold-button" onClick={() => setCreating(true)}>+ Novo registro</button></div>
+    {creating && <CreateDialog kind={section.id} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); remote.reload() }} />}
+    <article className="panel resource-panel">
+      <StatePanel loading={remote.loading} error={remote.error} onRetry={remote.reload} />
+      {remote.data && <><DataTable rows={remote.data.items} kind={section.id === 'oportunidades' ? 'deals' : section.id === 'fluxo' ? 'activities' : 'accounts'} onComplete={section.id === 'fluxo' ? complete : undefined} /><div className="pagination"><button disabled={page <= 1} onClick={() => setPage((v) => v - 1)}>Anterior</button><span>Página {page} de {Math.max(remote.data.totalPages, 1)}</span><button disabled={page >= remote.data.totalPages} onClick={() => setPage((v) => v + 1)}>Próxima</button></div></>}
+    </article>
+  </section>
+}
+
+function CreateDialog({ kind, onClose, onCreated }: { kind: string; onClose: () => void; onCreated: () => void }) {
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); setSaving(true); setError('')
+    const values = Object.fromEntries(new FormData(event.currentTarget))
+    let path = '/crm/accounts'; let body: Row = { name: values.name, email: values.email || undefined, phone: values.phone || undefined }
+    if (kind === 'oportunidades') { path = '/crm/deals'; body = { title: values.name, valueCents: Math.round(Number(values.value || 0) * 100), status: 'OPEN' } }
+    if (kind === 'fluxo') { path = '/crm/activities'; body = { title: values.name, type: 'TASK', status: 'PENDING', dueAt: values.dueAt ? new Date(String(values.dueAt)).toISOString() : undefined } }
+    try { await apiRequest({ method: 'POST', path, body, idempotencyKey: mutationKey() }); onCreated() }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'Falha ao salvar'); setSaving(false) }
+  }
+  return <div className="dialog-backdrop" role="presentation" onMouseDown={(e) => e.target === e.currentTarget && onClose()}><form className="dialog" onSubmit={submit}><div className="panel-heading"><h2>Novo registro</h2><button type="button" className="icon-button" onClick={onClose}><X /></button></div><label>Nome / título<input name="name" required autoFocus /></label>{kind === 'leads' && <><label>E-mail<input name="email" type="email" /></label><label>Telefone<input name="phone" /></label></>}{kind === 'oportunidades' && <label>Valor (R$)<input name="value" type="number" min="0" step=".01" /></label>}{kind === 'fluxo' && <label>Prazo<input name="dueAt" type="datetime-local" /></label>}{error && <div className="form-error">{error}</div>}<button className="gold-button" disabled={saving}>{saving ? 'Salvando…' : 'Salvar na API'}</button></form></div>
+}
+
+function Reports({ refreshKey }: { refreshKey: number }) {
+  const remote = useRemote(async () => (await apiRequest<Analytics>({ method: 'GET', path: '/analytics/dashboard' })).data, [refreshKey])
+  if (!remote.data) return <StatePanel loading={remote.loading} error={remote.error} onRetry={remote.reload} />
+  const blocks = [
+    ['CRM', remote.data.crm[0] ?? {}], ['Imobiliário', remote.data.imobiliario[0] ?? {}],
+    ['Vendas', remote.data.vendas[0] ?? {}], ['Tarefas', remote.data.tarefas[0] ?? {}],
+  ] as const
+  return <><div className="page-heading"><div><h1>Relatórios</h1><p>Indicadores consolidados em {new Date(remote.data.generatedAt).toLocaleString('pt-BR')}.</p></div><button className="period-button" onClick={remote.reload}><RefreshCw size={15} /> Atualizar</button></div><section className="report-grid">{blocks.map(([title, values]) => <article className="panel" key={title}><h2>{title}</h2><dl>{Object.entries(values).filter(([key]) => key !== 'empresaId').map(([key, value]) => <div key={key}><dt>{key.replace(/([A-Z])/g, ' $1')}</dt><dd>{String(value ?? 0)}</dd></div>)}</dl></article>)}</section></>
+}
+
+function Login({ onLogin }: { onLogin: (session: PublicSession) => void }) {
+  const [error, setError] = useState(''); const [loading, setLoading] = useState(false)
+  const health = useRemote(async () => (await apiHealth()).data, [])
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); setLoading(true); setError('')
+    const form = new FormData(event.currentTarget)
+    try { onLogin(await authApi.login({ email: String(form.get('email')), password: String(form.get('password')) })) }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível entrar'); setLoading(false) }
+  }
+  return <main className="login-page"><form className="login-card" onSubmit={submit}><Brand /><div><h1>Acesse sua operação</h1><p>Use sua conta REIS para carregar os dados da empresa.</p></div><div className={`connection-status ${health.data ? 'online' : health.error ? 'offline' : ''}`}><i />{health.data ? 'API REIS conectada' : health.error ? health.error : 'Verificando conexão…'}{health.error && <button type="button" onClick={health.reload}>Testar novamente</button>}</div><label>E-mail<input name="email" type="email" required autoFocus /></label><label>Senha<input name="password" type="password" required /></label>{error && <div className="form-error">{error}</div>}<button className="gold-button" disabled={loading || Boolean(health.error)}>{loading ? 'Conectando…' : 'Entrar'}</button></form></main>
 }
 
 function App() {
+  const [session, setSession] = useState<PublicSession | null | undefined>(undefined)
   const [activeId, setActiveId] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const [notifications, setNotifications] = useState(3)
-  const activeSection = useMemo(
-    () => sections.find((section) => section.id === activeId) ?? sections[0],
-    [activeId],
-  )
-
-  const navigate = (id: string) => {
-    setActiveId(id)
-    setSidebarOpen(false)
-  }
-
-  return (
-    <div className="app-shell">
-      <aside className={`sidebar ${sidebarOpen ? 'is-open' : ''}`}>
-        <div className="sidebar-top">
-          <Brand />
-          <button className="close-sidebar" type="button" onClick={() => setSidebarOpen(false)} aria-label="Fechar menu"><X /></button>
-        </div>
-        <button className="collapse-button" type="button" aria-label="Recolher menu"><ChevronLeft size={18} /></button>
-        <nav aria-label="Navegação principal">
-          {sections.map(({ id, label, icon: Icon }) => (
-            <button
-              className={activeId === id ? 'active' : ''}
-              key={id}
-              type="button"
-              onClick={() => navigate(id)}
-            >
-              <Icon size={20} /><span>{label}</span>
-            </button>
-          ))}
-        </nav>
-        <div className="sidebar-bottom">
-          <button type="button" onClick={() => navigate('configuracoes')}>
-            <Settings size={20} /><span>Configurações</span>
-          </button>
-          <div className="user-mini">
-            <div className="avatar">RR</div>
-            <div><strong>Renan Reis</strong><span>Admin</span></div>
-          </div>
-        </div>
-      </aside>
-      {sidebarOpen && <button className="sidebar-scrim" aria-label="Fechar menu" onClick={() => setSidebarOpen(false)} />}
-
-      <div className="workspace">
-        <header className="topbar">
-          <button className="menu-button" type="button" onClick={() => setSidebarOpen(true)} aria-label="Abrir menu"><Menu /></button>
-          <label className="search-box">
-            <Search size={19} />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar leads, deals, contatos..."
-              aria-label="Buscar"
-            />
-            {query && <button type="button" onClick={() => setQuery('')} aria-label="Limpar busca"><X size={16} /></button>}
-          </label>
-          <div className="top-actions">
-            <button className="notification" type="button" onClick={() => setNotifications(0)} aria-label={`${notifications} notificações`}>
-              <Bell size={19} />{notifications > 0 && <i />}
-            </button>
-            <button className="profile-button" type="button" aria-label="Abrir perfil">RR</button>
-          </div>
-        </header>
-
-        <main>
-          {query && <div className="search-feedback">Resultados para “{query}” serão exibidos aqui.</div>}
-          {activeId === 'dashboard'
-            ? <Dashboard />
-            : <ModulePage section={activeSection} />}
-        </main>
-      </div>
+  const [search, setSearch] = useState('')
+  const [refreshKey, setRefreshKey] = useState(0)
+  useEffect(() => { authApi.session().then(setSession).catch(() => setSession(null)) }, [])
+  useEffect(() => {
+    const expire = () => setSession(null)
+    const focus = () => setRefreshKey((value) => value + 1)
+    window.addEventListener(SESSION_EXPIRED_EVENT, expire)
+    window.addEventListener('focus', focus)
+    return () => {
+      window.removeEventListener(SESSION_EXPIRED_EVENT, expire)
+      window.removeEventListener('focus', focus)
+    }
+  }, [])
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(query.trim()), 350)
+    return () => clearTimeout(timer)
+  }, [query])
+  useEffect(() => window.reisDesktop?.deepLinks.subscribe((path) => {
+    if (path.startsWith('/crm/deals/')) setActiveId('oportunidades')
+    else if (path.startsWith('/preferencias')) setActiveId('configuracoes')
+  }), [])
+  const activeSection = useMemo(() => sections.find((item) => item.id === activeId) ?? sections[0], [activeId])
+  if (session === undefined) return <div className="boot-screen"><RefreshCw className="spin" /></div>
+  if (!session) return <Login onLogin={setSession} />
+  const userName = session.user.name ?? session.user.email
+  const navigate = (id: string) => { setActiveId(id); setSidebarOpen(false) }
+  const logout = async () => { await authApi.logout(); setSession(null) }
+  return <div className="app-shell">
+    <aside className={`sidebar ${sidebarOpen ? 'is-open' : ''}`}><div className="sidebar-top"><Brand /><button className="close-sidebar" onClick={() => setSidebarOpen(false)}><X /></button></div><button className="collapse-button"><ChevronLeft size={18} /></button><nav>{sections.map(({ id, label, icon: Icon }) => <button className={activeId === id ? 'active' : ''} key={id} onClick={() => navigate(id)}><Icon size={20} /><span>{label}</span></button>)}</nav><div className="sidebar-bottom"><button onClick={() => navigate('configuracoes')}><Settings size={20} /><span>Configurações</span></button><div className="user-mini"><div className="avatar">{initials(userName)}</div><div><strong>{userName}</strong><span>{session.user.role ?? 'Usuário'}</span></div></div></div></aside>
+    {sidebarOpen && <button className="sidebar-scrim" onClick={() => setSidebarOpen(false)} />}
+    <div className="workspace"><header className="topbar"><button className="menu-button" onClick={() => setSidebarOpen(true)}><Menu /></button><label className="search-box"><Search size={19} /><input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && activeId === 'dashboard') navigate('leads') }} placeholder="Buscar no módulo atual…" />{query && <button onClick={() => setQuery('')}><X size={16} /></button>}</label><div className="top-actions"><button className="notification" onClick={() => navigate('fluxo')}><Bell size={19} /></button><button className="profile-button" onClick={() => navigate('configuracoes')}>{initials(userName)}</button></div></header>
+      <main>{activeId === 'dashboard' ? <Dashboard refreshKey={refreshKey} /> : endpoints[activeId] ? <ResourcePage section={activeSection} search={search} refreshKey={refreshKey} /> : activeId === 'relatorios' ? <Reports refreshKey={refreshKey} /> : <section><div className="page-heading"><div><h1>Configurações</h1><p>Sessão e conexão da aplicação.</p></div></div><article className="panel settings-panel"><div><strong>{userName}</strong><span>{session.user.email}</span><small>{apiConfiguration.mode === 'desktop' ? 'Aplicativo desktop' : 'Aplicativo web'} · API {apiConfiguration.baseUrl} · sessão válida até {new Date(session.expiresAt).toLocaleString('pt-BR')}</small></div><button className="danger-button" onClick={logout}><LogOut size={17} /> Sair</button></article></section>}</main>
     </div>
-  )
+  </div>
 }
 
 export default App
