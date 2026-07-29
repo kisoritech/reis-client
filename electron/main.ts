@@ -24,7 +24,7 @@ protocol.registerSchemesAsPrivileged([
 ])
 
 const externalHosts = new Set(
-  (process.env.REIS_ALLOWED_EXTERNAL_HOSTS ?? 'localhost,app.seudominio.com')
+  (process.env.REIS_ALLOWED_EXTERNAL_HOSTS ?? 'localhost,app.seudominio.com,api-reis.onrender.com,accounts.google.com')
     .split(',')
     .map((host) => host.trim())
     .filter(Boolean),
