@@ -10,7 +10,7 @@ type ApiEnvelope<T> = {
   success: boolean
   message?: string
   data?: T
-  error?: { message?: string; fields?: Record<string, string[]> }
+  error?: { code?: string; message?: string; fields?: Record<string, string[]> }
   meta?: { requestId?: string }
 }
 
@@ -21,6 +21,7 @@ type StoredWebSession = PublicSession & {
 
 export class ReisApiError extends Error {
   readonly status: number
+  readonly code?: string
   readonly requestId?: string
   readonly fields?: Record<string, string[]>
   readonly retryAfter?: number
@@ -28,6 +29,7 @@ export class ReisApiError extends Error {
   constructor(
     message: string,
     status: number,
+    code?: string,
     requestId?: string,
     fields?: Record<string, string[]>,
     retryAfter?: number,
@@ -35,6 +37,7 @@ export class ReisApiError extends Error {
     super(message)
     this.name = 'ReisApiError'
     this.status = status
+    this.code = code
     this.requestId = requestId
     this.fields = fields
     this.retryAfter = retryAfter
@@ -179,6 +182,7 @@ async function parseResponse<T>(response: Response): Promise<ApiResult<T>> {
     throw new ReisApiError(
       envelope?.error?.message ?? envelope?.message ?? fallback[response.status] ?? `API indisponível (${response.status})`,
       response.status,
+      envelope?.error?.code,
       response.headers.get('x-request-id') ?? envelope?.meta?.requestId,
       envelope?.error?.fields,
       Number(response.headers.get('retry-after')) || undefined,

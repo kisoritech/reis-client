@@ -28,7 +28,8 @@ type ApiEnvelope<T> = {
   success?: boolean
   message?: string
   data?: T
-  error?: { message?: string }
+  error?: { code?: string; message?: string; fields?: Record<string, string[]> }
+  meta?: { requestId?: string }
 }
 
 function unwrap<T>(value: unknown): T {
@@ -180,12 +181,24 @@ export async function apiRequest(
       422: 'Revise os campos informados.',
       429: 'Muitas solicitações. Aguarde e tente novamente.',
     }
-    throw new Error(
-      envelope?.error?.message ??
-      envelope?.message ??
-      fallback[response.status] ??
-      `API indisponível (${response.status})`,
-    )
+    const fields = envelope?.error?.fields
+      ? Object.entries(envelope.error.fields)
+          .flatMap(([field, messages]) => messages.map((message) => `${field}: ${message}`))
+          .join(' • ')
+      : ''
+    const requestId = response.headers.get('x-request-id') ?? envelope?.meta?.requestId
+    const message =
+      envelope?.error?.code === 'DATABASE_SCHEMA_OUTDATED'
+        ? 'O serviço de atendimentos está temporariamente indisponível enquanto o banco é atualizado.'
+        : envelope?.error?.code === 'INVALID_ATTENDANCE_REFERENCE'
+          ? `Revise os campos informados.${fields ? ` ${fields}` : ''}`
+          : response.status === 409
+            ? 'Já existe um registro conflitante com os dados informados.'
+            : envelope?.error?.message ??
+              envelope?.message ??
+              fallback[response.status] ??
+              `API indisponível (${response.status})`
+    throw new Error(`${message}${requestId ? ` (protocolo ${requestId})` : ''}`)
   }
   return {
     data: unwrap(body),

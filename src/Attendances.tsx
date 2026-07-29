@@ -4,7 +4,7 @@ import {
   ArrowLeft, ArrowRight, Camera, Check, Plus, RefreshCw, Search,
 } from 'lucide-react'
 import type { PublicSession } from '../electron/contracts'
-import { apiRequest, mutationKey } from './api'
+import { apiRequest, mutationKey, ReisApiError } from './api'
 
 type CatalogItem = {
   id: string
@@ -22,16 +22,25 @@ type Catalogs = {
 }
 type Development = { id: string; nome: string; tipo?: string; cidade?: string }
 type User = { id: string; nome?: string; name?: string; email?: string; ativo?: boolean }
+type RelatedItem = { id: string; nome: string; telefone?: string }
+type Money = { amount: string; currency: 'BRL' }
 type Attendance = Record<string, unknown> & {
   id: string
   status?: string
-  clienteId?: string
-  empreendimentoId?: string
-  responsavelId?: string
-  tipoAtendimentoId?: string
-  valorNegociacao?: number | string
+  cliente?: RelatedItem
+  empreendimento?: RelatedItem
+  responsavel?: RelatedItem
+  tipoAtendimento?: RelatedItem
+  valorNegociacao?: Money
   observacoes?: string
   createdAt?: string
+}
+type AttendanceList = {
+  items: Attendance[]
+  page: number
+  limit: number
+  total: number
+  totalPages: number
 }
 
 const emptyCatalogs: Catalogs = {
@@ -39,7 +48,28 @@ const emptyCatalogs: Catalogs = {
 }
 
 function money(value: unknown) {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value ?? 0))
+  const amount = value && typeof value === 'object' && 'amount' in value
+    ? (value as Money).amount
+    : value
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(amount ?? 0))
+}
+
+function apiErrorMessage(reason: unknown, fallback: string) {
+  if (!(reason instanceof Error)) return fallback
+  if (reason instanceof ReisApiError) {
+    const fieldDetails = reason.fields
+      ? Object.entries(reason.fields).flatMap(([field, messages]) => messages.map((message) => `${field}: ${message}`)).join(' • ')
+      : ''
+    const message = reason.code === 'DATABASE_SCHEMA_OUTDATED'
+      ? 'O serviço de atendimentos está temporariamente indisponível enquanto o banco é atualizado.'
+      : reason.code === 'INVALID_ATTENDANCE_REFERENCE'
+        ? `Revise os campos informados.${fieldDetails ? ` ${fieldDetails}` : ''}`
+        : reason.status === 409
+          ? 'Já existe um registro conflitante com os dados informados.'
+          : reason.message
+    return `${message}${reason.requestId ? ` (protocolo ${reason.requestId})` : ''}`
+  }
+  return reason.message
 }
 
 export default function AttendancesPage({ session, refreshKey }: { session: PublicSession; refreshKey: number }) {
@@ -64,14 +94,18 @@ export default function AttendancesPage({ session, refreshKey }: { session: Publ
     setLoading(true)
     setError('')
     Promise.allSettled([
-      apiRequest<Attendance[]>({ method: 'GET', path: '/crm/atendimentos?limit=100' }),
+      apiRequest<AttendanceList | Attendance[]>({ method: 'GET', path: '/crm/atendimentos?limit=100' }),
       apiRequest<Catalogs>({ method: 'GET', path: '/crm/catalogos' }),
       apiRequest<Development[]>({ method: 'GET', path: '/imobiliario/empreendimentos' }),
       apiRequest<User[]>({ method: 'GET', path: '/organizacao/usuarios' }),
     ]).then(([attendanceResult, catalogResult, developmentResult, userResult]) => {
       if (!current) return
-      if (attendanceResult.status === 'fulfilled') setItems(attendanceResult.value.data)
-      else setError(attendanceResult.reason instanceof Error ? attendanceResult.reason.message : 'Falha ao carregar atendimentos')
+      if (attendanceResult.status === 'fulfilled') {
+        const payload = attendanceResult.value.data
+        setItems(Array.isArray(payload) ? payload : payload.items)
+      } else {
+        setError(apiErrorMessage(attendanceResult.reason, 'Falha ao carregar atendimentos'))
+      }
       if (catalogResult.status === 'fulfilled') setCatalogs(catalogResult.value.data)
       if (developmentResult.status === 'fulfilled') setDevelopments(developmentResult.value.data)
       if (userResult.status === 'fulfilled') {
@@ -85,17 +119,14 @@ export default function AttendancesPage({ session, refreshKey }: { session: Publ
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase()
     if (!term) return items
-    return items.filter((item) => Object.values(item).some((value) => String(value ?? '').toLowerCase().includes(term)))
+    return items.filter((item) => JSON.stringify(item).toLowerCase().includes(term))
   }, [items, query])
-  const lookup = (collection: Array<{ id: string; nome?: string; name?: string }>, id: unknown) =>
-    collection.find((item) => item.id === id)?.nome ?? collection.find((item) => item.id === id)?.name ?? 'Não informado'
-
   if (mode === 'form') return <AttendanceForm session={session} catalogs={catalogs} developments={developments} users={users} onCancel={() => setMode('list')} onCreated={() => { setMode('list'); setVersion((value) => value + 1) }} />
   return <section className="attendance-page"><div className="page-heading"><div><h1>Atendimentos</h1><p>{items.length} registros comerciais encontrados.</p></div><button className="gold-button attendance-create" onClick={() => setMode('form')}><Plus size={18} /> Novo atendimento</button></div>
     <article className="panel attendance-list-panel"><div className="attendance-list-toolbar"><label><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar no histórico…" /></label><button type="button" onClick={() => setVersion((value) => value + 1)}><RefreshCw size={16} /> Atualizar</button></div>
       {loading && <div className="state-panel"><RefreshCw className="spin" /><span>Consultando atendimentos…</span></div>}
       {error && <div className="state-panel error"><strong>Não foi possível carregar</strong><span>{error}</span><button onClick={() => setVersion((value) => value + 1)}>Tentar novamente</button></div>}
-      {!loading && !error && <div className="table-scroll"><table className="data-table attendance-table"><thead><tr><th>Data</th><th>Cliente</th><th>Empreendimento</th><th>Tipo</th><th>Responsável</th><th>Valor</th><th>Status</th></tr></thead><tbody>{filtered.map((item) => <tr key={item.id}><td>{item.createdAt ? new Date(item.createdAt).toLocaleDateString('pt-BR') : '—'}</td><td>{String(item.clienteNome ?? item.clienteId ?? 'Não informado')}</td><td>{lookup(developments, item.empreendimentoId)}</td><td>{lookup(catalogs.tiposAtendimento, item.tipoAtendimentoId)}</td><td>{lookup(users, item.responsavelId)}</td><td>{item.valorNegociacao === undefined ? '—' : money(item.valorNegociacao)}</td><td><span className="status-chip">{item.status ?? 'aberto'}</span></td></tr>)}</tbody></table>{!filtered.length && <div className="empty">Nenhum atendimento encontrado.</div>}</div>}
+      {!loading && !error && <div className="table-scroll"><table className="data-table attendance-table"><thead><tr><th>Data</th><th>Cliente</th><th>Empreendimento</th><th>Tipo</th><th>Responsável</th><th>Valor</th><th>Status</th></tr></thead><tbody>{filtered.map((item) => <tr key={item.id}><td>{item.createdAt ? new Date(item.createdAt).toLocaleDateString('pt-BR') : '—'}</td><td>{item.cliente?.nome ?? 'Não informado'}</td><td>{item.empreendimento?.nome ?? 'Não informado'}</td><td>{item.tipoAtendimento?.nome ?? 'Não informado'}</td><td>{item.responsavel?.nome ?? 'Não informado'}</td><td>{item.valorNegociacao === undefined ? '—' : money(item.valorNegociacao)}</td><td><span className="status-chip">{item.status ?? 'aberto'}</span></td></tr>)}</tbody></table>{!filtered.length && <div className="empty">Nenhum atendimento encontrado.</div>}</div>}
     </article>
   </section>
 }
@@ -156,14 +187,13 @@ function AttendanceForm({ session, catalogs, developments, users, onCancel, onCr
         descricao: values.notes || undefined,
         lembreteMinutos: 30,
         googleSyncEnabled: Boolean(values.googleSync),
-        enviarConfirmacao: true,
       }
     }
     try {
       await apiRequest({ method: 'POST', path: '/crm/atendimentos', body, idempotencyKey: mutationKey() })
       onCreated()
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Não foi possível registrar o atendimento')
+      setError(apiErrorMessage(reason, 'Não foi possível registrar o atendimento'))
       setSaving(false)
     }
   }
