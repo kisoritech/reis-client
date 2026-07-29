@@ -33,7 +33,7 @@ type SettingsProps = {
 const PREFERENCES_KEY = 'reis.preferences'
 const defaults: Preferences = {
   darkMode: true,
-  accent: '#d1a70f',
+  accent: '#c9a40a',
   fontScale: 100,
   density: 'normal',
   emailNotifications: true,
@@ -56,7 +56,9 @@ const tabs: Array<{ id: SettingsTab; label: string; icon: LucideIcon }> = [
 
 function loadPreferences(): Preferences {
   try {
-    return { ...defaults, ...JSON.parse(localStorage.getItem(PREFERENCES_KEY) ?? '{}') }
+    const stored = JSON.parse(localStorage.getItem(PREFERENCES_KEY) ?? '{}') as Partial<Preferences>
+    if (stored.accent === '#d1a70f') stored.accent = defaults.accent
+    return { ...defaults, ...stored }
   } catch {
     return defaults
   }
@@ -160,7 +162,7 @@ function ProfileSettings({ session, onSessionChange, onMessage }: {
 }
 
 function AppearanceSettings({ value, onChange }: { value: Preferences; onChange: (patch: Partial<Preferences>) => void }) {
-  const accents = ['#d1a70f', '#f1cb42', '#438cdf', '#20ac68', '#9352b6', '#ef493c']
+  const accents = ['#c9a40a', '#e6c456', '#438cdf', '#20ac68', '#9352b6', '#ef493c']
   return <div><header className="settings-section-heading"><h2>Aparência</h2><p>Personalize a interface visual do sistema.</p></header>
     <div className="settings-block row"><div><strong>Modo escuro</strong><span>Aparência escura do sistema</span></div><Switch checked={value.darkMode} onChange={(darkMode) => onChange({ darkMode })} label="Modo escuro" /></div>
     <div className="settings-block"><strong>Cor de destaque</strong><div className="accent-options">{accents.map((accent) => <button key={accent} type="button" aria-label={`Cor ${accent}`} className={value.accent === accent ? 'selected' : ''} style={{ background: accent }} onClick={() => onChange({ accent })} />)}</div></div>

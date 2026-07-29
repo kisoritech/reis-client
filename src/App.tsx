@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   BarChart3, Bell, CheckCircle2, ChevronLeft, CircleDollarSign, GitBranch,
-  LayoutDashboard, Menu, RefreshCw, Search, Settings, Target,
+  CalendarDays, ClipboardList, LayoutDashboard, Menu, RefreshCw, Search, Settings, Target,
   UsersRound, X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -17,6 +17,8 @@ import {
 import SettingsPage from './Settings'
 import LeadsPage from './Leads'
 import OperationalFlow from './OperationalFlow'
+import CalendarPage from './Calendar'
+import AttendancesPage from './Attendances'
 import './App.css'
 
 type Section = { id: string; label: string; icon: LucideIcon }
@@ -37,6 +39,8 @@ type Analytics = {
 
 const sections: Section[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'agenda', label: 'Agenda', icon: CalendarDays },
+  { id: 'atendimentos', label: 'Atendimentos', icon: ClipboardList },
   { id: 'leads', label: 'Leads', icon: UsersRound },
   { id: 'oportunidades', label: 'Oportunidades', icon: Target },
   { id: 'fluxo', label: 'Fluxo Operacional', icon: GitBranch },
@@ -87,7 +91,7 @@ function useRemote<T>(load: () => Promise<T>, dependencies: unknown[]) {
 }
 
 function Brand() {
-  return <div className="brand"><div className="brand-mark">R</div><div><strong>Renan Reis</strong><span>CRM Pro</span></div></div>
+  return <div className="brand"><div className="brand-mark" aria-hidden="true"><span>R</span></div><div><strong>Renan Reis</strong><span>Consultoria Imobiliária</span></div></div>
 }
 
 function StatePanel({ loading, error, onRetry }: { loading: boolean; error: string; onRetry: () => void }) {
@@ -221,6 +225,7 @@ function App() {
   }, [query])
   useEffect(() => window.reisDesktop?.deepLinks.subscribe((path) => {
     if (path.startsWith('/crm/deals/')) setActiveId('oportunidades')
+    else if (path.startsWith('/calendar/')) setActiveId('agenda')
     else if (path.startsWith('/preferencias')) setActiveId('configuracoes')
   }), [])
   const activeSection = useMemo(() => sections.find((item) => item.id === activeId) ?? sections[0], [activeId])
@@ -233,7 +238,7 @@ function App() {
     <aside className={`sidebar ${sidebarOpen ? 'is-open' : ''}`}><div className="sidebar-top"><Brand /><button className="close-sidebar" onClick={() => setSidebarOpen(false)}><X /></button></div><button className="collapse-button"><ChevronLeft size={18} /></button><nav>{sections.map(({ id, label, icon: Icon }) => <button className={activeId === id ? 'active' : ''} key={id} onClick={() => navigate(id)}><Icon size={20} /><span>{label}</span></button>)}</nav><div className="sidebar-bottom"><button onClick={() => navigate('configuracoes')}><Settings size={20} /><span>Configurações</span></button><div className="user-mini"><div className="avatar">{initials(userName)}</div><div><strong>{userName}</strong><span>{session.user.role ?? 'Usuário'}</span></div></div></div></aside>
     {sidebarOpen && <button className="sidebar-scrim" onClick={() => setSidebarOpen(false)} />}
     <div className="workspace"><header className="topbar"><button className="menu-button" onClick={() => setSidebarOpen(true)}><Menu /></button><label className="search-box"><Search size={19} /><input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && activeId === 'dashboard') navigate('leads') }} placeholder="Buscar no módulo atual…" />{query && <button onClick={() => setQuery('')}><X size={16} /></button>}</label><div className="top-actions"><button className="notification" onClick={() => navigate('fluxo')}><Bell size={19} /></button><button className="profile-button" onClick={() => navigate('configuracoes')}>{initials(userName)}</button></div></header>
-      <main>{activeId === 'dashboard' ? <Dashboard refreshKey={refreshKey} /> : activeId === 'leads' ? <LeadsPage search={search} refreshKey={refreshKey} /> : activeId === 'fluxo' ? <OperationalFlow refreshKey={refreshKey} onNavigate={navigate} /> : endpoints[activeId] ? <ResourcePage section={activeSection} search={search} refreshKey={refreshKey} /> : activeId === 'relatorios' ? <Reports refreshKey={refreshKey} /> : <SettingsPage session={session} onSessionChange={setSession} onLogout={logout} />}</main>
+      <main>{activeId === 'dashboard' ? <Dashboard refreshKey={refreshKey} /> : activeId === 'agenda' ? <CalendarPage refreshKey={refreshKey} /> : activeId === 'atendimentos' ? <AttendancesPage session={session} refreshKey={refreshKey} /> : activeId === 'leads' ? <LeadsPage search={search} refreshKey={refreshKey} /> : activeId === 'fluxo' ? <OperationalFlow refreshKey={refreshKey} onNavigate={navigate} /> : endpoints[activeId] ? <ResourcePage section={activeSection} search={search} refreshKey={refreshKey} /> : activeId === 'relatorios' ? <Reports refreshKey={refreshKey} /> : <SettingsPage session={session} onSessionChange={setSession} onLogout={logout} />}</main>
     </div>
   </div>
 }
