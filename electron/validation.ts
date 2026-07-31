@@ -18,6 +18,12 @@ const allowedRoots = [
   '/health',
 ]
 
+function isAllowedApiPath(path: string) {
+  return allowedRoots.some((root) =>
+    root.endsWith('/') ? path.startsWith(root) : path === root || path.startsWith(`${root}/`),
+  )
+}
+
 export const apiRequestSchema = z
   .object({
     method: z.enum(['GET', 'POST', 'PATCH', 'DELETE']),
@@ -29,7 +35,7 @@ export const apiRequestSchema = z
     ({ path }) =>
       !path.includes('..') &&
       !path.includes('://') &&
-      allowedRoots.some((root) => path === root || path.startsWith(root)),
+      isAllowedApiPath(path),
     'Endpoint não permitido',
   )
   .refine(

@@ -7,7 +7,8 @@ import {
   protocol,
   shell,
 } from 'electron'
-import { join } from 'node:path'
+import { join, relative, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { apiRequest, login, logout, publicSession } from './api-client'
 import {
   apiRequestSchema,
@@ -33,10 +34,15 @@ let mainWindow: BrowserWindow | null = null
 let pendingDeepLink: string | null = null
 
 function isTrustedSender(senderUrl: string): boolean {
-  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    return senderUrl.startsWith(MAIN_WINDOW_VITE_DEV_SERVER_URL)
+  try {
+    const sender = new URL(senderUrl)
+    if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+      return sender.origin === new URL(MAIN_WINDOW_VITE_DEV_SERVER_URL).origin
+    }
+    return sender.protocol === 'reis-app:' && sender.hostname === 'renderer'
+  } catch {
+    return false
   }
-  return senderUrl.startsWith('reis-app://renderer/')
 }
 
 function registerIpc(): void {
@@ -103,10 +109,7 @@ async function createWindow(): Promise<void> {
     return { action: 'deny' }
   })
   mainWindow.webContents.on('will-navigate', (event, url) => {
-    const allowed = MAIN_WINDOW_VITE_DEV_SERVER_URL
-      ? url.startsWith(MAIN_WINDOW_VITE_DEV_SERVER_URL)
-      : url.startsWith('reis-app://renderer/')
-    if (!allowed) event.preventDefault()
+    if (!isTrustedSender(url)) event.preventDefault()
   })
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -132,10 +135,14 @@ app.on('open-url', (event, url) => {
 void app.whenReady().then(async () => {
   app.setAsDefaultProtocolClient('reis')
   protocol.handle('reis-app', (request) => {
-    const pathname = new URL(request.url).pathname.replace(/^\/+/, '')
+    const pathname = decodeURIComponent(new URL(request.url).pathname).replace(/^[/\\]+/, '')
     const rendererRoot = join(import.meta.dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}`)
-    const safePath = pathname && !pathname.includes('..') ? pathname : 'index.html'
-    return net.fetch(new URL(`file://${join(rendererRoot, safePath)}`).toString())
+    const requestedPath = resolve(rendererRoot, pathname || 'index.html')
+    const relativePath = relative(rendererRoot, requestedPath)
+    const safePath = relativePath && !relativePath.startsWith('..') && !relativePath.includes(':')
+      ? requestedPath
+      : resolve(rendererRoot, 'index.html')
+    return net.fetch(pathToFileURL(safePath).toString())
   })
   registerIpc()
   Menu.setApplicationMenu(

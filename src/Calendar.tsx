@@ -112,7 +112,7 @@ export default function CalendarPage({ refreshKey }: { refreshKey: number }) {
   return <section className="calendar-page">
     <div className="page-heading"><div><h1>Agenda</h1><p>Registre compromissos e acompanhe o cronograma operacional.</p></div><button className="gold-button calendar-create" onClick={() => setCreating(true)}><Plus size={18} /> Novo agendamento</button></div>
     {creating && <NewEventDialog initialDate={selectedDate} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); setVersion((value) => value + 1) }} />}
-    {selectedEvent && <EventDetails event={selectedEvent} onClose={() => setSelectedEvent(null)} />}
+    {selectedEvent && <EventDetails event={selectedEvent} onClose={() => setSelectedEvent(null)} onChanged={() => { setSelectedEvent(null); setVersion((value) => value + 1) }} />}
     <article className="panel calendar-panel">
       <div className="calendar-toolbar">
         <div className="calendar-period"><button type="button" onClick={() => changeMonth(-1)} aria-label="Mês anterior"><ChevronLeft /></button><button type="button" className="today-button" onClick={today}>Hoje</button><button type="button" onClick={() => changeMonth(1)} aria-label="Próximo mês"><ChevronRight /></button><h2>{month.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</h2></div>
@@ -137,8 +137,33 @@ function EventList({ events, onSelect, compact = false }: { events: CalendarEven
   return <div className="schedule-list">{[...events].sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime()).map((event) => <button type="button" key={event.id} onClick={() => onSelect(event)}><span className={`schedule-marker event-${event.status ?? 'agendado'}`} /><span className="schedule-date"><strong>{new Date(event.inicio).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</strong><small>{formatTime(event.inicio)}–{formatTime(event.fim)}</small></span><span className="schedule-title"><strong>{event.titulo}</strong><small>{event.tipo ?? 'Compromisso'}{event.local ? ` · ${event.local}` : ''}</small></span><span className="status-chip">{statusLabel(event.status)}</span></button>)}</div>
 }
 
-function EventDetails({ event, onClose }: { event: CalendarEvent; onClose: () => void }) {
-  return <div className="dialog-backdrop" role="presentation" onMouseDown={(click) => click.target === click.currentTarget && onClose()}><div className="dialog event-details"><div className="panel-heading"><div><span className="status-chip">{statusLabel(event.status)}</span><h2>{event.titulo}</h2></div><button type="button" className="icon-button" onClick={onClose}><X /></button></div><dl><div><dt><CalendarDays size={17} /> Data</dt><dd>{new Date(event.inicio).toLocaleDateString('pt-BR', { dateStyle: 'full' })}</dd></div><div><dt><Clock3 size={17} /> Horário</dt><dd>{formatTime(event.inicio)} às {formatTime(event.fim)}</dd></div>{event.local && <div><dt><MapPin size={17} /> Local</dt><dd>{event.local}</dd></div>}</dl>{event.descricao && <p>{event.descricao}</p>}<button type="button" className="gold-button" onClick={onClose}>Fechar</button></div></div>
+function EventDetails({ event, onClose, onChanged }: { event: CalendarEvent; onClose: () => void; onChanged: () => void }) {
+  const [working, setWorking] = useState(false)
+  const [error, setError] = useState('')
+  const updateStatus = async (status: string) => {
+    setWorking(true)
+    setError('')
+    try {
+      await apiRequest({ method: 'PATCH', path: `/calendar/events/${event.id}`, body: { status }, idempotencyKey: mutationKey() })
+      onChanged()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível atualizar o agendamento')
+      setWorking(false)
+    }
+  }
+  const remove = async () => {
+    if (!window.confirm('Excluir definitivamente este agendamento?')) return
+    setWorking(true)
+    setError('')
+    try {
+      await apiRequest({ method: 'DELETE', path: `/calendar/events/${event.id}` })
+      onChanged()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível excluir o agendamento')
+      setWorking(false)
+    }
+  }
+  return <div className="dialog-backdrop" role="presentation" onMouseDown={(click) => click.target === click.currentTarget && onClose()}><div className="dialog event-details"><div className="panel-heading"><div><span className="status-chip">{statusLabel(event.status)}</span><h2>{event.titulo}</h2></div><button type="button" className="icon-button" onClick={onClose}><X /></button></div><dl><div><dt><CalendarDays size={17} /> Data</dt><dd>{new Date(event.inicio).toLocaleDateString('pt-BR', { dateStyle: 'full' })}</dd></div><div><dt><Clock3 size={17} /> Horário</dt><dd>{formatTime(event.inicio)} às {formatTime(event.fim)}</dd></div>{event.local && <div><dt><MapPin size={17} /> Local</dt><dd>{event.local}</dd></div>}</dl>{event.descricao && <p>{event.descricao}</p>}{error && <div className="form-error">{error}</div>}<div className="dialog-actions"><button type="button" className="outline-button danger-action" disabled={working} onClick={() => void remove()}>Excluir</button>{event.status !== 'cancelado' && <button type="button" className="outline-button" disabled={working} onClick={() => void updateStatus('cancelado')}>Cancelar agenda</button>}{event.status !== 'realizado' && <button type="button" className="outline-button success-action" disabled={working} onClick={() => void updateStatus('realizado')}>Marcar realizado</button>}<button type="button" className="gold-button" disabled={working} onClick={onClose}>Fechar</button></div></div></div>
 }
 
 function NewEventDialog({ initialDate, onClose, onCreated }: { initialDate: string; onClose: () => void; onCreated: () => void }) {

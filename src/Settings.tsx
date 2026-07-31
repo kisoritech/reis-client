@@ -140,12 +140,11 @@ function ProfileSettings({ session, onSessionChange, onMessage }: {
     const values = new FormData(event.currentTarget)
     const body = {
       nome: String(values.get('name') ?? ''),
-      email: String(values.get('email') ?? ''),
       telefone: String(values.get('phone') ?? '') || undefined,
     }
     try {
       await apiRequest({ method: 'PATCH', path: `/organizacao/usuarios/${session.user.id}`, body, idempotencyKey: mutationKey() })
-      onSessionChange({ ...session, user: { ...session.user, name: body.nome, email: body.email } })
+      onSessionChange({ ...session, user: { ...session.user, name: body.nome } })
       onMessage({ kind: 'success', text: 'Perfil atualizado na API REIS.' })
     } catch (error) {
       onMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Não foi possível salvar o perfil.' })
@@ -157,7 +156,7 @@ function ProfileSettings({ session, onSessionChange, onMessage }: {
   return <div><header className="settings-section-heading"><h2>Perfil & Conta</h2><p>Informações pessoais e preferências de conta.</p></header>
     <div className="profile-summary"><div className="profile-avatar">{name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()}</div><div><strong>{name}</strong><span>{session.user.email}</span><small>{session.user.role ?? 'Usuário'}</small></div></div>
     {!canUpdate && <Message kind="info">Seu perfil permite consultar estes dados, mas não alterá-los.</Message>}
-    <form className="settings-form" onSubmit={submit}><label>Nome completo<input name="name" defaultValue={name} required disabled={!canUpdate} /></label><label>E-mail<input name="email" type="email" defaultValue={session.user.email} required disabled={!canUpdate} /></label><label>Telefone<input name="phone" placeholder="+55 (11) 99999-0000" disabled={!canUpdate} /></label><label>Empresa<input value={session.user.companyId ?? 'Empresa vinculada à sessão'} disabled /></label><label>Cargo<input value={session.user.role ?? 'Usuário'} disabled /></label><label>Fuso horário<input value="America/Sao_Paulo" disabled /></label><button className="gold-button" disabled={saving || !canUpdate}>{saving ? 'Salvando…' : 'Salvar alterações'}</button></form>
+    <form className="settings-form" onSubmit={submit}><label>Nome completo<input name="name" defaultValue={name} required disabled={!canUpdate} /></label><label>E-mail<input name="email" type="email" defaultValue={session.user.email} disabled title="A alteração de e-mail exige confirmação pelo provedor de autenticação" /></label><label>Telefone<input name="phone" placeholder="+55 (11) 99999-0000" disabled={!canUpdate} /></label><label>Empresa<input value={session.user.companyId ?? 'Empresa vinculada à sessão'} disabled /></label><label>Cargo<input value={session.user.role ?? 'Usuário'} disabled /></label><label>Fuso horário<input value="America/Sao_Paulo" disabled /></label><p className="settings-note full-field">O e-mail de acesso só poderá ser alterado quando a API sincronizar a mudança com o provedor de autenticação.</p><button className="gold-button" disabled={saving || !canUpdate}>{saving ? 'Salvando…' : 'Salvar alterações'}</button></form>
   </div>
 }
 

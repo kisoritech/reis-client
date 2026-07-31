@@ -34,5 +34,8 @@ describe('desktop security boundaries', () => {
     expect(
       apiRequestSchema.safeParse({ method: 'GET', path: '/admin/secrets' }).success,
     ).toBe(false)
+    expect(
+      apiRequestSchema.safeParse({ method: 'GET', path: '/health-malicious' }).success,
+    ).toBe(false)
   })
 })
