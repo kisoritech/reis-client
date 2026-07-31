@@ -33,6 +33,9 @@ Exemplo do vínculo persistido:
 - UUID de outra empresa é rejeitado como referência inválida.
 - Um imóvel não pode ser associado no atendimento a um empreendimento
   diferente daquele registrado em `imobiliario.imoveis.empreendimento_id`.
+- Um novo atendimento que informe `imovelId` também deve informar
+  `empreendimentoId`; a API rejeita o contrato incompleto antes da gravação e o
+  banco repete a proteção com uma restrição `CHECK`.
 - O cadastro e a alteração de imóvel aceitam `empreendimentoId` e validam o
   vínculo com a empresa antes de gravar.
 - Atendimentos antigos sem imóvel continuam válidos para preservar
