@@ -1,5 +1,8 @@
 import type { ForgeConfig } from '@electron-forge/shared-types'
 import { MakerZIP } from '@electron-forge/maker-zip'
+import { MakerSquirrel } from '@electron-forge/maker-squirrel'
+import { MakerDeb } from '@electron-forge/maker-deb'
+import { MakerRpm } from '@electron-forge/maker-rpm'
 import { VitePlugin } from '@electron-forge/plugin-vite'
 
 const config: ForgeConfig = {
@@ -30,7 +33,19 @@ const config: ForgeConfig = {
           }
         : undefined,
   },
-  makers: [new MakerZIP({}, ['darwin'])],
+  makers: [
+    new MakerSquirrel({ name: 'REIS' }),
+    new MakerZIP({}, ['darwin']),
+    new MakerDeb({
+      options: {
+        maintainer: 'Kisori Tech',
+        homepage: 'https://github.com/kisoritech/reis-client',
+      },
+    }),
+    new MakerRpm({
+      options: { homepage: 'https://github.com/kisoritech/reis-client' },
+    }),
+  ],
   plugins: [
     new VitePlugin({
       build: [

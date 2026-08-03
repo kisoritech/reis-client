@@ -297,8 +297,8 @@ Compila renderer, main e preload e gera o aplicativo em `out/`.
 npm run make
 ```
 
-Atualmente o Forge está configurado para gerar ZIP no macOS. A configuração
-inclui:
+O Forge gera instalador Squirrel no Windows, pacotes DEB/RPM no Linux e ZIP no
+macOS. A configuração inclui:
 
 - bundle ID `com.reis.desktop`;
 - nome e executável `REIS`;
@@ -307,8 +307,10 @@ inclui:
 - ASAR;
 - assinatura e notarização quando as variáveis Apple estão presentes.
 
-O DMG e a publicação automática devem ser configurados no runner macOS antes da
-release pública.
+Os workflows validam cada alteração e publicam os artefatos dos três sistemas
+quando uma tag `vX.Y.Z` é enviada. Consulte
+[`DISTRIBUICAO_MULTIPLATAFORMA.md`](DISTRIBUICAO_MULTIPLATAFORMA.md) para o fluxo
+SemVer, requisitos de assinatura e o caminho recomendado para iOS.
 
 ## Qualidade e testes
 
