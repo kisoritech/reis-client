@@ -90,6 +90,7 @@ function normalizeUser(value: Record<string, unknown>): PublicUser {
     id: String(value.id ?? ''),
     name: String(value.name ?? value.nome ?? value.email ?? 'Usuário'),
     email: String(value.email ?? ''),
+    phone: value.phone ? String(value.phone) : value.telefone ? String(value.telefone) : undefined,
     companyId: value.companyId ? String(value.companyId) : value.empresaId ? String(value.empresaId) : undefined,
     role: value.role ? String(value.role) : undefined,
     avatarUrl: value.avatarUrl ? String(value.avatarUrl) : undefined,

@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   Bell, CircleHelp, Database, Globe2, HelpCircle, LockKeyhole,
-  Mail, Palette, PlugZap, ShieldCheck, Star, UserRound, Video,
+  Mail, Palette, Pencil, PlugZap, Save, ShieldCheck, Star, Trash2, UserRound, UsersRound, Video, X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { PublicSession } from '../electron/contracts'
 import { apiRequest, mutationKey } from './api'
 
 type SettingsTab =
-  | 'profile' | 'appearance' | 'notifications' | 'security'
+  | 'profile' | 'users' | 'appearance' | 'notifications' | 'security'
   | 'integrations' | 'privacy' | 'locale' | 'help'
 
 type Preferences = {
@@ -45,6 +45,7 @@ const defaults: Preferences = {
 
 const tabs: Array<{ id: SettingsTab; label: string; icon: LucideIcon }> = [
   { id: 'profile', label: 'Perfil & Conta', icon: UserRound },
+  { id: 'users', label: 'Usuários', icon: UsersRound },
   { id: 'appearance', label: 'Aparência', icon: Palette },
   { id: 'notifications', label: 'Notificações', icon: Bell },
   { id: 'security', label: 'Segurança', icon: LockKeyhole },
@@ -113,11 +114,12 @@ export default function Settings({ session, onSessionChange, onLogout }: Setting
       <div className="settings-content">
         {message && <Message kind={message.kind}>{message.text}</Message>}
         {active === 'profile' && <ProfileSettings session={session} onSessionChange={onSessionChange} onMessage={setMessage} />}
+        {active === 'users' && <UsersSettings session={session} onSessionChange={onSessionChange} onMessage={setMessage} />}
         {active === 'appearance' && <AppearanceSettings value={preferences} onChange={updatePreferences} />}
         {active === 'notifications' && <NotificationSettings value={preferences} onChange={updatePreferences} />}
         {active === 'security' && <SecuritySettings session={session} />}
         {active === 'integrations' && <IntegrationSettings onMessage={setMessage} />}
-        {active === 'privacy' && <PrivacySettings onLogout={onLogout} />}
+        {active === 'privacy' && <PrivacySettings session={session} onLogout={onLogout} onMessage={setMessage} />}
         {active === 'locale' && <LocaleSettings value={preferences} onChange={updatePreferences} />}
         {active === 'help' && <HelpSettings />}
       </div>
@@ -144,7 +146,7 @@ function ProfileSettings({ session, onSessionChange, onMessage }: {
     }
     try {
       await apiRequest({ method: 'PATCH', path: `/organizacao/usuarios/${session.user.id}`, body, idempotencyKey: mutationKey() })
-      onSessionChange({ ...session, user: { ...session.user, name: body.nome } })
+      onSessionChange({ ...session, user: { ...session.user, name: body.nome, phone: body.telefone } })
       onMessage({ kind: 'success', text: 'Perfil atualizado na API REIS.' })
     } catch (error) {
       onMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Não foi possível salvar o perfil.' })
@@ -156,7 +158,69 @@ function ProfileSettings({ session, onSessionChange, onMessage }: {
   return <div><header className="settings-section-heading"><h2>Perfil & Conta</h2><p>Informações pessoais e preferências de conta.</p></header>
     <div className="profile-summary"><div className="profile-avatar">{name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()}</div><div><strong>{name}</strong><span>{session.user.email}</span><small>{session.user.role ?? 'Usuário'}</small></div></div>
     {!canUpdate && <Message kind="info">Seu perfil permite consultar estes dados, mas não alterá-los.</Message>}
-    <form className="settings-form" onSubmit={submit}><label>Nome completo<input name="name" defaultValue={name} required disabled={!canUpdate} /></label><label>E-mail<input name="email" type="email" defaultValue={session.user.email} disabled title="A alteração de e-mail exige confirmação pelo provedor de autenticação" /></label><label>Telefone<input name="phone" placeholder="+55 (11) 99999-0000" disabled={!canUpdate} /></label><label>Empresa<input value={session.user.companyId ?? 'Empresa vinculada à sessão'} disabled /></label><label>Cargo<input value={session.user.role ?? 'Usuário'} disabled /></label><label>Fuso horário<input value="America/Sao_Paulo" disabled /></label><p className="settings-note full-field">O e-mail de acesso só poderá ser alterado quando a API sincronizar a mudança com o provedor de autenticação.</p><button className="gold-button" disabled={saving || !canUpdate}>{saving ? 'Salvando…' : 'Salvar alterações'}</button></form>
+    <form className="settings-form" onSubmit={submit}><label>Nome completo<input name="name" defaultValue={name} required disabled={!canUpdate} /></label><label>E-mail<input name="email" type="email" defaultValue={session.user.email} disabled title="A alteração de e-mail exige confirmação pelo provedor de autenticação" /></label><label>Telefone<input name="phone" type="tel" defaultValue={session.user.phone ?? ''} placeholder="+55 (11) 99999-0000" disabled={!canUpdate} /></label><label>Empresa<input value={session.user.companyId ?? 'Empresa vinculada à sessão'} disabled /></label><label>Cargo<input value={session.user.role ?? 'Usuário'} disabled /></label><label>Fuso horário<input value="America/Sao_Paulo" disabled /></label><p className="settings-note full-field">O e-mail de acesso só poderá ser alterado quando a API sincronizar a mudança com o provedor de autenticação.</p><button className="gold-button" disabled={saving || !canUpdate}>{saving ? 'Salvando…' : 'Salvar alterações'}</button></form>
+  </div>
+}
+
+type OrganizationUser = { id: string; nome?: string; name?: string; email: string; telefone?: string; phone?: string; ativo?: boolean; cargo?: { nome?: string }; role?: string }
+
+function UsersSettings({ session, onSessionChange, onMessage }: {
+  session: PublicSession
+  onSessionChange: (session: PublicSession) => void
+  onMessage: (message: { kind: 'success' | 'error' | 'info'; text: string }) => void
+}) {
+  const [users, setUsers] = useState<OrganizationUser[]>([])
+  const [loading, setLoading] = useState(true)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [draft, setDraft] = useState({ nome: '', telefone: '' })
+  const [savingId, setSavingId] = useState<string | null>(null)
+  const canManage = session.user.permissions.some((permission) => ['usuarios.update', 'usuarios.manage'].includes(permission))
+
+  useEffect(() => {
+    setLoading(true)
+    apiRequest<OrganizationUser[]>({ method: 'GET', path: '/organizacao/usuarios' })
+      .then((result) => setUsers(result.data))
+      .catch((error) => onMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Não foi possível carregar os usuários.' }))
+      .finally(() => setLoading(false))
+  }, [onMessage])
+
+  const edit = (user: OrganizationUser) => {
+    setEditingId(user.id)
+    setDraft({ nome: user.nome ?? user.name ?? '', telefone: user.telefone ?? user.phone ?? '' })
+  }
+  const save = async (user: OrganizationUser) => {
+    setSavingId(user.id)
+    try {
+      await apiRequest({ method: 'PATCH', path: `/organizacao/usuarios/${user.id}`, body: draft, idempotencyKey: mutationKey() })
+      setUsers((current) => current.map((item) => item.id === user.id ? { ...item, nome: draft.nome, telefone: draft.telefone } : item))
+      if (user.id === session.user.id) onSessionChange({ ...session, user: { ...session.user, name: draft.nome, phone: draft.telefone } })
+      setEditingId(null)
+      onMessage({ kind: 'success', text: 'Usuário atualizado com sucesso.' })
+    } catch (error) {
+      onMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Não foi possível atualizar o usuário.' })
+    } finally { setSavingId(null) }
+  }
+  const toggleStatus = async (user: OrganizationUser) => {
+    const ativo = user.ativo === false
+    const action = ativo ? 'reativar' : 'desativar'
+    if (!window.confirm(`Deseja realmente ${action} a conta de ${user.nome ?? user.name ?? user.email}?`)) return
+    setSavingId(user.id)
+    try {
+      await apiRequest({ method: 'PATCH', path: `/organizacao/usuarios/${user.id}/status`, body: { ativo }, idempotencyKey: mutationKey() })
+      setUsers((current) => current.map((item) => item.id === user.id ? { ...item, ativo } : item))
+      onMessage({ kind: 'success', text: ativo ? 'Conta reativada.' : 'Conta desativada e sem acesso ao sistema.' })
+    } catch (error) {
+      onMessage({ kind: 'error', text: error instanceof Error ? error.message : `Não foi possível ${action} a conta.` })
+    } finally { setSavingId(null) }
+  }
+
+  return <div><header className="settings-section-heading"><h2>Usuários</h2><p>Edite os dados diretamente na tabela e gerencie o acesso das contas.</p></header>
+    {!canManage && <Message kind="info">Seu perfil não possui permissão para alterar usuários.</Message>}
+    {loading ? <div className="settings-loading">Carregando usuários…</div> : <div className="users-table-scroll"><table className="users-table"><thead><tr><th>Nome</th><th>E-mail</th><th>Telefone</th><th>Cargo</th><th>Status</th><th aria-label="Ações" /></tr></thead><tbody>{users.map((user) => {
+      const editing = editingId === user.id
+      return <tr key={user.id}><td>{editing ? <input value={draft.nome} onChange={(event) => setDraft((value) => ({ ...value, nome: event.target.value }))} /> : user.nome ?? user.name ?? '—'}</td><td>{user.email}</td><td>{editing ? <input type="tel" value={draft.telefone} onChange={(event) => setDraft((value) => ({ ...value, telefone: event.target.value }))} /> : user.telefone ?? user.phone ?? '—'}</td><td>{user.cargo?.nome ?? user.role ?? '—'}</td><td><span className={`user-status ${user.ativo === false ? 'inactive' : 'active'}`}>{user.ativo === false ? 'Inativo' : 'Ativo'}</span></td><td><div className="user-row-actions">{editing ? <><button type="button" className="icon-button" title="Salvar" disabled={savingId === user.id || !draft.nome.trim()} onClick={() => void save(user)}><Save size={17} /></button><button type="button" className="icon-button" title="Cancelar" onClick={() => setEditingId(null)}><X size={17} /></button></> : <button type="button" className="icon-button" title="Editar usuário" disabled={!canManage || savingId === user.id} onClick={() => edit(user)}><Pencil size={17} /></button>}<button type="button" className={user.ativo === false ? 'icon-button' : 'icon-button destructive'} title={user.ativo === false ? 'Reativar conta' : 'Desativar conta'} disabled={!canManage || savingId === user.id || user.id === session.user.id} onClick={() => void toggleStatus(user)}><Trash2 size={17} /></button></div></td></tr>
+    })}</tbody></table></div>}
+    <p className="settings-note">A API preserva o histórico ao desativar contas e bloqueia novos acessos. A conta atual pode ser desativada em Dados &amp; Privacidade.</p>
   </div>
 }
 
@@ -233,16 +297,28 @@ function IntegrationSettings({ onMessage }: { onMessage: (message: { kind: 'succ
   return <div><header className="settings-section-heading"><h2>Integrações</h2><p>Conecte ferramentas e automatize seu fluxo.</p></header>{loading ? <div className="settings-loading">Consultando integrações na API…</div> : <div className="integration-grid">{items.map((item) => <article className="integration-card" key={item.name}><div className="integration-logo"><PlugZap size={20} /></div><div><strong>{item.name}</strong><span className={item.connected ? 'connected' : ''}>{item.connected ? 'Conectado' : item.detail}</span>{item.connected && item.detail && <small>{item.detail}</small>}</div><button type="button" className="outline-button" disabled={!item.action} onClick={item.action}>{item.action ? item.connected ? 'Desconectar' : 'Conectar' : 'Indisponível'}</button></article>)}</div>}</div>
 }
 
-function PrivacySettings({ onLogout }: { onLogout: () => Promise<void> }) {
+function PrivacySettings({ session, onLogout, onMessage }: { session: PublicSession; onLogout: () => Promise<void>; onMessage: (message: { kind: 'success' | 'error' | 'info'; text: string }) => void }) {
+  const [deleting, setDeleting] = useState(false)
   const clearPreferences = () => {
     localStorage.removeItem(PREFERENCES_KEY)
     applyPreferences(defaults)
     window.location.reload()
   }
+  const deleteAccount = async () => {
+    if (!window.confirm('Deseja desativar sua conta? O acesso será encerrado imediatamente.')) return
+    setDeleting(true)
+    try {
+      await apiRequest({ method: 'PATCH', path: `/organizacao/usuarios/${session.user.id}/status`, body: { ativo: false }, idempotencyKey: mutationKey() })
+      await onLogout()
+    } catch (error) {
+      onMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Não foi possível desativar sua conta.' })
+      setDeleting(false)
+    }
+  }
   return <div><header className="settings-section-heading"><h2>Dados & Privacidade</h2><p>Controle os dados mantidos neste dispositivo.</p></header>
     <div className="settings-block row"><div><strong>Preferências locais</strong><span>Aparência, idioma e opções de notificação</span></div><button className="outline-button" onClick={clearPreferences}>Limpar dados locais</button></div>
     <div className="settings-block row"><div><strong>Encerrar sessão</strong><span>Remove os tokens locais e revoga a sessão atual</span></div><button className="danger-button" onClick={() => void onLogout()}>Sair deste dispositivo</button></div>
-    <div className="settings-block danger-zone"><strong>Excluir conta</strong><p className="settings-note">A exclusão definitiva permanece indisponível porque a API não oferece esse endpoint. Nenhum dado será removido parcialmente pelo cliente.</p><button className="danger-button" disabled>Excluir conta</button></div>
+    <div className="settings-block danger-zone"><strong>Excluir conta</strong><p className="settings-note">Sua conta será desativada, o acesso será encerrado e o histórico corporativo será preservado.</p><button className="danger-button" disabled={deleting} onClick={() => void deleteAccount()}>{deleting ? 'Excluindo…' : 'Excluir minha conta'}</button></div>
   </div>
 }
 

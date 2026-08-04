@@ -62,6 +62,7 @@ function normalizeAuth(value: unknown): AuthResponse {
       id: String(rawUser.id),
       name: String(rawUser.name ?? rawUser.nome ?? rawUser.email ?? 'Usuário'),
       email: String(rawUser.email ?? ''),
+      phone: rawUser.phone ? String(rawUser.phone) : rawUser.telefone ? String(rawUser.telefone) : undefined,
       companyId: rawUser.companyId
         ? String(rawUser.companyId)
         : rawUser.empresaId ? String(rawUser.empresaId) : undefined,

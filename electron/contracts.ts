@@ -2,6 +2,7 @@ export type PublicUser = {
   id: string
   name?: string
   email: string
+  phone?: string
   companyId?: string
   role?: string
   avatarUrl?: string
