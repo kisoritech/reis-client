@@ -236,6 +236,28 @@ Instale as dependências:
 npm ci
 ```
 
+### Atualização em qualquer sistema
+
+Em um clone do projeto, a mesma rotina funciona no Windows, macOS e Linux:
+
+```bash
+npm run app:update:check
+npm run app:update
+```
+
+No PowerShell com execução de scripts desabilitada, use `npm.cmd` no lugar de
+`npm` (por exemplo, `npm.cmd run app:update`).
+
+O atualizador valida a instalação do Git, consulta a branch correspondente no
+remoto `origin`, aceita somente atualização *fast-forward* e executa `npm ci`
+quando o `package-lock.json` mudar. Por segurança, ele interrompe a operação se
+houver arquivos modificados, commits locais ainda não enviados ou *detached
+HEAD*. Assim, nenhuma alteração local é sobrescrita automaticamente.
+
+Essa rotina atualiza clones que contêm o código-fonte. Instalações geradas por
+`npm run make` devem ser atualizadas instalando o artefato da nova GitHub
+Release correspondente ao sistema operacional.
+
 Use `.env.example` como referência:
 
 ```env
