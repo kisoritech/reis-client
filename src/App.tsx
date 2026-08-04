@@ -92,7 +92,7 @@ function useRemote<T>(load: () => Promise<T>, dependencies: unknown[]) {
 }
 
 function Brand() {
-  return <div className="brand"><div className="brand-mark" aria-hidden="true"><span>R</span></div><div><strong>Renan Reis</strong><span>Consultoria Imobiliária</span></div></div>
+  return <div className="brand"><div className="brand-mark" aria-hidden="true"><img src="/brand/reis-logo.png" alt="" /></div><div><strong>Renan Reis</strong><span>Consultoria Imobiliária</span></div></div>
 }
 
 function StatePanel({ loading, error, onRetry }: { loading: boolean; error: string; onRetry: () => void }) {

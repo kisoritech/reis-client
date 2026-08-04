@@ -135,7 +135,7 @@ h1, h2, h3 { text-wrap: balance; }
   font-family: var(--display-font); font-weight: 500; font-size: 31px; line-height: 1;
 }
 .brand-mark::after { content: ''; position: absolute; inset: 6px; border: 1px solid rgba(201,164,10,.22); }
-.brand-mark span { position: relative; z-index: 1; background: linear-gradient(135deg, #9c7418, #f3d56d 48%, #b58516); background-clip: text; -webkit-background-clip: text; color: transparent; }
+.brand-mark img { position: relative; z-index: 1; width: 86%; height: 86%; object-fit: contain; }
 .brand div:last-child { display: flex; flex-direction: column; line-height: 1.25; }
 .brand strong { font-family: var(--display-font); font-size: 18px; font-weight: 600; letter-spacing: .1px; }
 .brand div:last-child span { color: var(--gold-soft); font-size: 10px; letter-spacing: 1.15px; text-transform: uppercase; }

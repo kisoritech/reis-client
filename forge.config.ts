@@ -11,6 +11,7 @@ const config: ForgeConfig = {
     executableName: 'REIS',
     appBundleId: 'com.reis.desktop',
     appCategoryType: 'public.app-category.business',
+    icon: 'build/icon',
     asar: true,
     protocols: [{ name: 'REIS', schemes: ['reis'] }],
     osxSign: process.env.APPLE_SIGN_IDENTITY
@@ -34,7 +35,7 @@ const config: ForgeConfig = {
         : undefined,
   },
   makers: [
-    new MakerSquirrel({ name: 'REIS' }),
+    new MakerSquirrel({ name: 'REIS', setupIcon: 'build/icon.ico' }),
     new MakerZIP({}, ['darwin']),
     new MakerDeb({
       options: {

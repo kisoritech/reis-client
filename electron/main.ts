@@ -92,6 +92,7 @@ async function createWindow(): Promise<void> {
     minWidth: 1100,
     minHeight: 700,
     show: false,
+    icon: join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/icon-512.png`),
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 18 },
     webPreferences: {
