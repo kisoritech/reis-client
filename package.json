@@ -1,9 +1,8 @@
 {
   "name": "reis-client",
   "productName": "REIS",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
-  "type": "module",
   "description": "Cliente web e desktop seguro da plataforma REIS",
   "author": "Kisori Tech",
   "homepage": "https://github.com/kisoritech/reis-client",

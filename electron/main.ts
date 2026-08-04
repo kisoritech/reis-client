@@ -7,6 +7,7 @@ import {
   protocol,
   shell,
 } from 'electron'
+import squirrelStartup from 'electron-squirrel-startup'
 import { join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { apiRequest, login, logout, publicSession } from './api-client'
@@ -19,6 +20,10 @@ import {
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined
 declare const MAIN_WINDOW_VITE_NAME: string
+
+// Squirrel inicia o executável durante instalação, atualização e remoção.
+// Nesses eventos o aplicativo deve encerrar antes de criar janelas ou registrar IPC.
+if (squirrelStartup) app.quit()
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'reis-app', privileges: { standard: true, secure: true, supportFetchAPI: true } },
@@ -90,7 +95,7 @@ async function createWindow(): Promise<void> {
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 18 },
     webPreferences: {
-      preload: join(import.meta.dirname, 'preload.js'),
+      preload: join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -136,7 +141,7 @@ void app.whenReady().then(async () => {
   app.setAsDefaultProtocolClient('reis')
   protocol.handle('reis-app', (request) => {
     const pathname = decodeURIComponent(new URL(request.url).pathname).replace(/^[/\\]+/, '')
-    const rendererRoot = join(import.meta.dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}`)
+    const rendererRoot = join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}`)
     const requestedPath = resolve(rendererRoot, pathname || 'index.html')
     const relativePath = relative(rendererRoot, requestedPath)
     const safePath = relativePath && !relativePath.startsWith('..') && !relativePath.includes(':')
