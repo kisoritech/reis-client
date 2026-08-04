@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   Bell, CircleHelp, Database, Globe2, HelpCircle, LockKeyhole,
-  Mail, Palette, Pencil, PlugZap, Save, ShieldCheck, Star, Trash2, UserRound, UsersRound, Video, X,
+  Mail, Palette, Pencil, PlugZap, Save, ShieldCheck, Star, Trash2, UserPlus, UserRound, UsersRound, Video, X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { PublicSession } from '../electron/contracts'
@@ -92,6 +92,7 @@ export default function Settings({ session, onSessionChange, onLogout }: Setting
   const [active, setActive] = useState<SettingsTab>('profile')
   const [preferences, setPreferences] = useState(loadPreferences)
   const [message, setMessage] = useState<{ kind: 'success' | 'error' | 'info'; text: string } | null>(null)
+  const isDev = session.user.role?.trim().toLowerCase() === 'dev'
 
   const updatePreferences = (patch: Partial<Preferences>) => {
     setPreferences((current) => {
@@ -109,12 +110,12 @@ export default function Settings({ session, onSessionChange, onLogout }: Setting
     <div className="page-heading"><div><h1>Configurações</h1><p>Gerencie sua conta e preferências do sistema.</p></div></div>
     <div className="settings-layout">
       <nav className="settings-nav" aria-label="Seções das configurações">
-        {tabs.map(({ id, label, icon: Icon }) => <button type="button" key={id} className={active === id ? 'active' : ''} onClick={() => setActive(id)}><Icon size={18} /><span>{label}</span></button>)}
+        {tabs.filter(({ id }) => id !== 'users' || isDev).map(({ id, label, icon: Icon }) => <button type="button" key={id} className={active === id ? 'active' : ''} onClick={() => setActive(id)}><Icon size={18} /><span>{label}</span></button>)}
       </nav>
       <div className="settings-content">
         {message && <Message kind={message.kind}>{message.text}</Message>}
         {active === 'profile' && <ProfileSettings session={session} onSessionChange={onSessionChange} onMessage={setMessage} />}
-        {active === 'users' && <UsersSettings session={session} onSessionChange={onSessionChange} onMessage={setMessage} />}
+        {active === 'users' && isDev && <UsersSettings session={session} onSessionChange={onSessionChange} onMessage={setMessage} />}
         {active === 'appearance' && <AppearanceSettings value={preferences} onChange={updatePreferences} />}
         {active === 'notifications' && <NotificationSettings value={preferences} onChange={updatePreferences} />}
         {active === 'security' && <SecuritySettings session={session} />}
@@ -146,7 +147,15 @@ function ProfileSettings({ session, onSessionChange, onMessage }: {
     }
     try {
       await apiRequest({ method: 'PATCH', path: `/organizacao/usuarios/${session.user.id}`, body, idempotencyKey: mutationKey() })
-      onSessionChange({ ...session, user: { ...session.user, name: body.nome, phone: body.telefone } })
+      const refreshed = await apiRequest<OrganizationUser[]>({ method: 'GET', path: '/organizacao/usuarios' })
+      const persisted = refreshed.data.find((user) => user.id === session.user.id)
+      if (!persisted) throw new Error('A API não retornou o usuário atualizado.')
+      const persistedName = persisted.nome ?? persisted.name ?? body.nome
+      const persistedPhone = persisted.telefone ?? persisted.phone
+      if (persistedName !== body.nome || (persistedPhone ?? '') !== (body.telefone ?? '')) {
+        throw new Error('A API recebeu a alteração, mas não persistiu todos os dados. Tente novamente.')
+      }
+      onSessionChange({ ...session, user: { ...session.user, name: persistedName, phone: persistedPhone } })
       onMessage({ kind: 'success', text: 'Perfil atualizado na API REIS.' })
     } catch (error) {
       onMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Não foi possível salvar o perfil.' })
@@ -162,7 +171,8 @@ function ProfileSettings({ session, onSessionChange, onMessage }: {
   </div>
 }
 
-type OrganizationUser = { id: string; nome?: string; name?: string; email: string; telefone?: string; phone?: string; ativo?: boolean; cargo?: { nome?: string }; role?: string }
+type OrganizationUser = { id: string; nome?: string; name?: string; email: string; telefone?: string; phone?: string; ativo?: boolean; cargoId?: string; cargo?: { id?: string; nome?: string }; role?: string }
+type OrganizationRole = { id: string; nome?: string; name?: string; descricao?: string; empresaId?: string }
 
 function UsersSettings({ session, onSessionChange, onMessage }: {
   session: PublicSession
@@ -172,28 +182,48 @@ function UsersSettings({ session, onSessionChange, onMessage }: {
   const [users, setUsers] = useState<OrganizationUser[]>([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [draft, setDraft] = useState({ nome: '', telefone: '' })
+  const [draft, setDraft] = useState({ nome: '', telefone: '', cargoId: '' })
   const [savingId, setSavingId] = useState<string | null>(null)
-  const canManage = session.user.permissions.some((permission) => ['usuarios.update', 'usuarios.manage'].includes(permission))
+  const [roles, setRoles] = useState<OrganizationRole[]>([])
+  const [creating, setCreating] = useState(false)
+  const canManage = session.user.role?.trim().toLowerCase() === 'dev'
+
+  const loadUsers = async () => {
+    const result = await apiRequest<OrganizationUser[]>({ method: 'GET', path: '/organizacao/usuarios' })
+    setUsers(result.data)
+    return result.data
+  }
+  const loadRoles = async () => {
+    const result = await apiRequest<OrganizationRole[]>({ method: 'GET', path: '/organizacao/cargos' })
+    setRoles(result.data)
+    return result.data
+  }
 
   useEffect(() => {
     setLoading(true)
-    apiRequest<OrganizationUser[]>({ method: 'GET', path: '/organizacao/usuarios' })
-      .then((result) => setUsers(result.data))
+    Promise.all([loadUsers(), loadRoles()])
       .catch((error) => onMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Não foi possível carregar os usuários.' }))
       .finally(() => setLoading(false))
+    // A lista deve ser carregada apenas quando a seção é aberta.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onMessage])
 
   const edit = (user: OrganizationUser) => {
     setEditingId(user.id)
-    setDraft({ nome: user.nome ?? user.name ?? '', telefone: user.telefone ?? user.phone ?? '' })
+    setDraft({ nome: user.nome ?? user.name ?? '', telefone: user.telefone ?? user.phone ?? '', cargoId: user.cargoId ?? user.cargo?.id ?? '' })
   }
   const save = async (user: OrganizationUser) => {
     setSavingId(user.id)
     try {
-      await apiRequest({ method: 'PATCH', path: `/organizacao/usuarios/${user.id}`, body: draft, idempotencyKey: mutationKey() })
-      setUsers((current) => current.map((item) => item.id === user.id ? { ...item, nome: draft.nome, telefone: draft.telefone } : item))
-      if (user.id === session.user.id) onSessionChange({ ...session, user: { ...session.user, name: draft.nome, phone: draft.telefone } })
+      await apiRequest({ method: 'PATCH', path: `/organizacao/usuarios/${user.id}`, body: { ...draft, cargoId: draft.cargoId || undefined }, idempotencyKey: mutationKey() })
+      const persisted = (await loadUsers()).find((item) => item.id === user.id)
+      if (!persisted) throw new Error('A API não retornou o usuário atualizado.')
+      const persistedName = persisted.nome ?? persisted.name ?? ''
+      const persistedPhone = persisted.telefone ?? persisted.phone ?? ''
+      if (persistedName !== draft.nome || persistedPhone !== draft.telefone) {
+        throw new Error('A API recebeu a alteração, mas não persistiu todos os dados. Tente novamente.')
+      }
+      if (user.id === session.user.id) onSessionChange({ ...session, user: { ...session.user, name: persistedName, phone: persistedPhone } })
       setEditingId(null)
       onMessage({ kind: 'success', text: 'Usuário atualizado com sucesso.' })
     } catch (error) {
@@ -214,14 +244,83 @@ function UsersSettings({ session, onSessionChange, onMessage }: {
     } finally { setSavingId(null) }
   }
 
-  return <div><header className="settings-section-heading"><h2>Usuários</h2><p>Edite os dados diretamente na tabela e gerencie o acesso das contas.</p></header>
+  return <div><header className="settings-section-heading users-heading"><div><h2>Usuários</h2><p>Edite os dados diretamente na tabela e gerencie o acesso das contas.</p></div><button type="button" className="gold-button" onClick={() => setCreating(true)}><UserPlus size={17} /> Novo usuário</button></header>
+    {creating && <CreateUserDialog users={users} onClose={() => setCreating(false)} onCreated={async () => { const updated = await loadUsers(); await loadRoles(); return updated }} onSuccess={() => onMessage({ kind: 'success', text: 'Usuário criado e confirmado na API.' })} />}
     {!canManage && <Message kind="info">Seu perfil não possui permissão para alterar usuários.</Message>}
     {loading ? <div className="settings-loading">Carregando usuários…</div> : <div className="users-table-scroll"><table className="users-table"><thead><tr><th>Nome</th><th>E-mail</th><th>Telefone</th><th>Cargo</th><th>Status</th><th aria-label="Ações" /></tr></thead><tbody>{users.map((user) => {
       const editing = editingId === user.id
-      return <tr key={user.id}><td>{editing ? <input value={draft.nome} onChange={(event) => setDraft((value) => ({ ...value, nome: event.target.value }))} /> : user.nome ?? user.name ?? '—'}</td><td>{user.email}</td><td>{editing ? <input type="tel" value={draft.telefone} onChange={(event) => setDraft((value) => ({ ...value, telefone: event.target.value }))} /> : user.telefone ?? user.phone ?? '—'}</td><td>{user.cargo?.nome ?? user.role ?? '—'}</td><td><span className={`user-status ${user.ativo === false ? 'inactive' : 'active'}`}>{user.ativo === false ? 'Inativo' : 'Ativo'}</span></td><td><div className="user-row-actions">{editing ? <><button type="button" className="icon-button" title="Salvar" disabled={savingId === user.id || !draft.nome.trim()} onClick={() => void save(user)}><Save size={17} /></button><button type="button" className="icon-button" title="Cancelar" onClick={() => setEditingId(null)}><X size={17} /></button></> : <button type="button" className="icon-button" title="Editar usuário" disabled={!canManage || savingId === user.id} onClick={() => edit(user)}><Pencil size={17} /></button>}<button type="button" className={user.ativo === false ? 'icon-button' : 'icon-button destructive'} title={user.ativo === false ? 'Reativar conta' : 'Desativar conta'} disabled={!canManage || savingId === user.id || user.id === session.user.id} onClick={() => void toggleStatus(user)}><Trash2 size={17} /></button></div></td></tr>
+      return <tr key={user.id}><td>{editing ? <input value={draft.nome} onChange={(event) => setDraft((value) => ({ ...value, nome: event.target.value }))} /> : user.nome ?? user.name ?? '—'}</td><td>{user.email}</td><td>{editing ? <input type="tel" value={draft.telefone} onChange={(event) => setDraft((value) => ({ ...value, telefone: event.target.value }))} /> : user.telefone ?? user.phone ?? '—'}</td><td>{editing ? <select value={draft.cargoId} onChange={(event) => setDraft((value) => ({ ...value, cargoId: event.target.value }))}><option value="">Sem cargo</option>{roles.map((role) => <option key={role.id} value={role.id}>{role.nome ?? role.name}</option>)}</select> : user.cargo?.nome ?? user.role ?? '—'}</td><td><span className={`user-status ${user.ativo === false ? 'inactive' : 'active'}`}>{user.ativo === false ? 'Inativo' : 'Ativo'}</span></td><td><div className="user-row-actions">{editing ? <><button type="button" className="icon-button" title="Salvar" disabled={savingId === user.id || !draft.nome.trim()} onClick={() => void save(user)}><Save size={17} /></button><button type="button" className="icon-button" title="Cancelar" onClick={() => setEditingId(null)}><X size={17} /></button></> : <button type="button" className="icon-button" title="Editar usuário" disabled={!canManage || savingId === user.id} onClick={() => edit(user)}><Pencil size={17} /></button>}<button type="button" className={user.ativo === false ? 'icon-button' : 'icon-button destructive'} title={user.ativo === false ? 'Reativar conta' : 'Desativar conta'} disabled={!canManage || savingId === user.id || user.id === session.user.id} onClick={() => void toggleStatus(user)}><Trash2 size={17} /></button></div></td></tr>
     })}</tbody></table></div>}
+    <CargoManager roles={roles} onReload={loadRoles} onMessage={onMessage} />
     <p className="settings-note">A API preserva o histórico ao desativar contas e bloqueia novos acessos. A conta atual pode ser desativada em Dados &amp; Privacidade.</p>
   </div>
+}
+
+function CreateUserDialog({ users, onClose, onCreated, onSuccess }: { users: OrganizationUser[]; onClose: () => void; onCreated: () => Promise<OrganizationUser[]>; onSuccess: () => void }) {
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setError('')
+    const values = new FormData(event.currentTarget)
+    const nome = String(values.get('name') ?? '').trim()
+    const email = String(values.get('email') ?? '').trim().toLowerCase()
+    const telefone = String(values.get('phone') ?? '').trim()
+    const password = String(values.get('password') ?? '')
+    const perfil = String(values.get('profile') ?? 'usuario_padrao')
+    if (users.some((user) => user.email.trim().toLowerCase() === email)) {
+      setError('Já existe um usuário cadastrado com este e-mail.')
+      return
+    }
+    if (telefone && !/^\+[1-9]\d{7,14}$/.test(telefone)) {
+      setError('Informe o telefone no formato internacional, por exemplo +5565999999999.')
+      return
+    }
+    if (password.length < 6) {
+      setError('A senha provisória deve ter pelo menos 6 caracteres.')
+      return
+    }
+    setSaving(true)
+    try {
+      const body = { nome, email, telefone: telefone || undefined, password, perfil }
+      await apiRequest<OrganizationUser>({ method: 'POST', path: '/organizacao/usuarios', body, idempotencyKey: mutationKey() })
+      const persisted = (await onCreated()).some((user) => user.email.trim().toLowerCase() === email)
+      if (!persisted) throw new Error('A API recebeu o cadastro, mas o novo usuário não apareceu na listagem.')
+      onSuccess()
+      onClose()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível cadastrar o usuário.')
+      setSaving(false)
+    }
+  }
+  return <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="dialog user-dialog" onSubmit={submit}><div className="panel-heading"><div><h2>Novo usuário</h2><p>Cadastre os dados e defina o perfil inicial de acesso.</p></div><button type="button" className="icon-button" onClick={onClose}><X /></button></div><div className="dialog-fields"><label>Nome completo<input name="name" minLength={2} required autoFocus /></label><label>E-mail de acesso<input name="email" type="email" required /></label><label>Telefone<input name="phone" type="tel" placeholder="+5565999999999" /></label><label>Perfil inicial<select name="profile" defaultValue="usuario_padrao"><option value="usuario_padrao">Usuário padrão</option><option value="gerente">Gerente</option><option value="usuario_master">Usuário master</option><option value="ceo">CEO</option><option value="dev">Dev</option></select></label><label className="full-field">Senha provisória<input name="password" type="password" minLength={6} autoComplete="new-password" required placeholder="Mínimo de 6 caracteres" /></label></div>{error && <div className="form-error">{error}</div>}<div className="dialog-actions"><button type="button" className="outline-button" onClick={onClose}>Cancelar</button><button className="gold-button" disabled={saving}>{saving ? 'Cadastrando…' : 'Cadastrar usuário'}</button></div></form></div>
+}
+
+function CargoManager({ roles, onReload, onMessage }: { roles: OrganizationRole[]; onReload: () => Promise<OrganizationRole[]>; onMessage: (message: { kind: 'success' | 'error' | 'info'; text: string }) => void }) {
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [working, setWorking] = useState(false)
+  const create = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); setWorking(true)
+    try {
+      await apiRequest({ method: 'POST', path: '/organizacao/cargos', body: { nome: name.trim(), descricao: description.trim() || undefined }, idempotencyKey: mutationKey() })
+      await onReload(); setName(''); setDescription('')
+      onMessage({ kind: 'success', text: 'Cargo criado com sucesso.' })
+    } catch (error) { onMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Não foi possível criar o cargo.' }) }
+    finally { setWorking(false) }
+  }
+  const rename = async (role: OrganizationRole) => {
+    const nome = window.prompt('Novo nome do cargo:', role.nome ?? role.name ?? '')?.trim()
+    if (!nome) return
+    try { await apiRequest({ method: 'PATCH', path: `/organizacao/cargos/${role.id}`, body: { nome }, idempotencyKey: mutationKey() }); await onReload(); onMessage({ kind: 'success', text: 'Cargo atualizado.' }) }
+    catch (error) { onMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Não foi possível atualizar o cargo.' }) }
+  }
+  const remove = async (role: OrganizationRole) => {
+    if (!window.confirm(`Excluir o cargo ${role.nome ?? role.name}?`)) return
+    try { await apiRequest({ method: 'DELETE', path: `/organizacao/cargos/${role.id}` }); await onReload(); onMessage({ kind: 'success', text: 'Cargo excluído.' }) }
+    catch (error) { onMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Não foi possível excluir o cargo.' }) }
+  }
+  return <section className="cargo-manager"><div><h3>Cargos</h3><p>Crie cargos e depois atribua-os pela edição do usuário.</p></div><form onSubmit={create}><input value={name} onChange={(event) => setName(event.target.value)} minLength={2} maxLength={100} required placeholder="Nome do cargo" /><input value={description} onChange={(event) => setDescription(event.target.value)} maxLength={500} placeholder="Descrição (opcional)" /><button className="outline-button" disabled={working}>{working ? 'Criando…' : 'Adicionar cargo'}</button></form><div className="cargo-list">{roles.map((role) => <div key={role.id}><span><strong>{role.nome ?? role.name}</strong><small>{role.descricao || 'Sem descrição'}</small></span><div><button type="button" className="icon-button" title="Editar cargo" onClick={() => void rename(role)}><Pencil size={16} /></button><button type="button" className="icon-button destructive" title="Excluir cargo" onClick={() => void remove(role)}><Trash2 size={16} /></button></div></div>)}</div></section>
 }
 
 function AppearanceSettings({ value, onChange }: { value: Preferences; onChange: (patch: Partial<Preferences>) => void }) {

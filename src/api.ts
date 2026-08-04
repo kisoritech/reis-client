@@ -92,7 +92,11 @@ function normalizeUser(value: Record<string, unknown>): PublicUser {
     email: String(value.email ?? ''),
     phone: value.phone ? String(value.phone) : value.telefone ? String(value.telefone) : undefined,
     companyId: value.companyId ? String(value.companyId) : value.empresaId ? String(value.empresaId) : undefined,
-    role: value.role ? String(value.role) : undefined,
+    role: value.role && typeof value.role !== 'object'
+      ? String(value.role)
+      : value.cargo && typeof value.cargo === 'object' && 'nome' in value.cargo
+        ? String((value.cargo as { nome: unknown }).nome)
+        : undefined,
     avatarUrl: value.avatarUrl ? String(value.avatarUrl) : undefined,
     permissions: Array.isArray(value.permissions) ? value.permissions.map(String) : [],
   }
@@ -180,8 +184,12 @@ async function parseResponse<T>(response: Response): Promise<ApiResult<T>> {
       422: 'Revise os campos informados.',
       429: 'Muitas solicitações. Aguarde e tente novamente.',
     }
+    const fieldDetails = envelope?.error?.fields
+      ? Object.entries(envelope.error.fields).flatMap(([field, messages]) => messages.map((message) => `${field}: ${message}`)).join(' • ')
+      : ''
+    const message = envelope?.error?.message ?? envelope?.message ?? fallback[response.status] ?? `API indisponível (${response.status})`
     throw new ReisApiError(
-      envelope?.error?.message ?? envelope?.message ?? fallback[response.status] ?? `API indisponível (${response.status})`,
+      fieldDetails ? `${message} • ${fieldDetails}` : message,
       response.status,
       envelope?.error?.code,
       response.headers.get('x-request-id') ?? envelope?.meta?.requestId,
@@ -205,7 +213,19 @@ export const authApi = {
       return null
     }
     const current = readWebSession()
-    return current ? { user: current.user, expiresAt: current.expiresAt } : null
+    if (!current) return null
+    try {
+      const response = await webFetch('/auth/me', { method: 'GET' })
+      if (response.ok) {
+        const value = unwrap<Record<string, unknown>>(await response.json())
+        const rawUser = (value.user ?? value) as Record<string, unknown>
+        current.user = { ...current.user, ...normalizeUser(rawUser) }
+        writeWebSession(current)
+      }
+    } catch {
+      // A sessão local continua válida quando a consulta de perfil estiver temporariamente indisponível.
+    }
+    return { user: current.user, expiresAt: current.expiresAt }
   },
   async login(input: LoginInput): Promise<PublicSession> {
     if (window.reisDesktop) return window.reisDesktop.auth.login(input)

@@ -66,12 +66,33 @@ function normalizeAuth(value: unknown): AuthResponse {
       companyId: rawUser.companyId
         ? String(rawUser.companyId)
         : rawUser.empresaId ? String(rawUser.empresaId) : undefined,
-      role: rawUser.role ? String(rawUser.role) : undefined,
+      role: rawUser.role && typeof rawUser.role !== 'object'
+        ? String(rawUser.role)
+        : rawUser.cargo && typeof rawUser.cargo === 'object' && 'nome' in rawUser.cargo
+          ? String((rawUser.cargo as { nome: unknown }).nome)
+          : undefined,
       avatarUrl: rawUser.avatarUrl ? String(rawUser.avatarUrl) : undefined,
       permissions: Array.isArray(rawUser.permissions)
         ? rawUser.permissions.map(String)
         : [],
     },
+  }
+}
+
+function normalizePublicUser(rawUser: Record<string, unknown>): PublicSession['user'] {
+  return {
+    id: String(rawUser.id ?? ''),
+    name: String(rawUser.name ?? rawUser.nome ?? rawUser.email ?? 'Usuário'),
+    email: String(rawUser.email ?? ''),
+    phone: rawUser.phone ? String(rawUser.phone) : rawUser.telefone ? String(rawUser.telefone) : undefined,
+    companyId: rawUser.companyId ? String(rawUser.companyId) : rawUser.empresaId ? String(rawUser.empresaId) : undefined,
+    role: rawUser.role && typeof rawUser.role !== 'object'
+      ? String(rawUser.role)
+      : rawUser.cargo && typeof rawUser.cargo === 'object' && 'nome' in rawUser.cargo
+        ? String((rawUser.cargo as { nome: unknown }).nome)
+        : undefined,
+    avatarUrl: rawUser.avatarUrl ? String(rawUser.avatarUrl) : undefined,
+    permissions: Array.isArray(rawUser.permissions) ? rawUser.permissions.map(String) : [],
   }
 }
 
@@ -150,6 +171,18 @@ export async function publicSession(): Promise<PublicSession | null> {
     if (!await refresh()) return null
     const renewed = await loadSession()
     return renewed ? toPublicSession(renewed) : null
+  }
+  try {
+    const response = await fetchJson('/auth/me', { method: 'GET' }, session.accessToken)
+    if (response.ok) {
+      const value = unwrap<Record<string, unknown>>(await response.json())
+      const rawUser = (value.user ?? value) as Record<string, unknown>
+      const updated = { ...session, user: { ...session.user, ...normalizePublicUser(rawUser) } }
+      await saveSession(updated)
+      return toPublicSession(updated)
+    }
+  } catch {
+    // Mantém a sessão criptografada quando a API estiver temporariamente indisponível.
   }
   return toPublicSession(session)
 }

@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
-  BarChart3, Bell, CheckCircle2, ChevronLeft, CircleDollarSign, GitBranch,
-  CalendarDays, ClipboardList, LayoutDashboard, Menu, RefreshCw, Search, Settings, Target,
+  BarChart3, Bell, CheckCircle2, ChevronLeft, CircleDollarSign, Clock3, GitBranch,
+  CalendarDays, ClipboardList, LayoutDashboard, MapPin, Menu, RefreshCw, Search, Settings, Target,
   UsersRound, X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -93,6 +93,50 @@ function useRemote<T>(load: () => Promise<T>, dependencies: unknown[]) {
 
 function Brand() {
   return <div className="brand"><div className="brand-mark" aria-hidden="true"><img src="/brand/reis-logo.png" alt="" /></div><div><strong>Renan Reis</strong><span>Consultoria Imobiliária</span></div></div>
+}
+type DayEvent = { id: string; titulo: string; inicio: string; fim: string; local?: string; status?: string; tipo?: string }
+
+function TopbarNotifications({ refreshKey, onOpenAgenda }: { refreshKey: number; onOpenAgenda: () => void }) {
+  const [events, setEvents] = useState<DayEvent[]>([])
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const container = useRef<HTMLDivElement>(null)
+  const load = useCallback(async () => {
+    const start = new Date(); start.setHours(0, 0, 0, 0)
+    const end = new Date(); end.setHours(23, 59, 59, 999)
+    const query = new URLSearchParams({ start: start.toISOString(), end: end.toISOString() })
+    try {
+      const result = await apiRequest<DayEvent[]>({ method: 'GET', path: `/calendar/events?${query}` })
+      setEvents(result.data.filter((event) => event.status !== 'cancelado').sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime()))
+      setError('')
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível consultar a agenda.')
+    } finally { setLoading(false) }
+  }, [])
+  useEffect(() => {
+    void load()
+    const timer = window.setInterval(() => void load(), 5 * 60 * 1000)
+    return () => window.clearInterval(timer)
+  }, [load, refreshKey])
+  useEffect(() => {
+    const close = (event: MouseEvent) => {
+      if (container.current && !container.current.contains(event.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [])
+  const now = Date.now()
+  const upcoming = events.filter((event) => new Date(event.fim).getTime() >= now)
+  return <div className="notification-center" ref={container}>
+    <button type="button" className={`notification ${upcoming.length ? 'has-events' : ''}`} aria-label={`${upcoming.length} agendamento(s) para hoje`} aria-expanded={open} onClick={() => setOpen((value) => !value)}><Bell size={19} />{upcoming.length > 0 && <i>{upcoming.length > 9 ? '9+' : upcoming.length}</i>}</button>
+    {open && <div className="notification-popover"><header><div><strong>Agenda de hoje</strong><span>{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</span></div><button type="button" onClick={() => void load()} aria-label="Atualizar notificações"><RefreshCw size={16} className={loading ? 'spin' : ''} /></button></header>
+      <div className="notification-list">{loading && !events.length ? <div className="notification-empty">Consultando agendamentos…</div> : error ? <div className="notification-empty error">{error}</div> : !events.length ? <div className="notification-empty">Nenhum agendamento para hoje.</div> : events.map((event) => {
+        const finished = new Date(event.fim).getTime() < now
+        return <button type="button" key={event.id} className={finished ? 'finished' : ''} onClick={() => { setOpen(false); onOpenAgenda() }}><span className="notification-time"><Clock3 size={15} />{new Date(event.inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span><span className="notification-title"><strong>{event.titulo}</strong><small>{event.local ? <><MapPin size={12} />{event.local}</> : event.tipo ?? 'Compromisso'}{finished && ' · Encerrado'}</small></span></button>
+      })}</div><button type="button" className="notification-footer" onClick={() => { setOpen(false); onOpenAgenda() }}>Ver agenda completa</button>
+    </div>}
+  </div>
 }
 
 function StatePanel({ loading, error, onRetry }: { loading: boolean; error: string; onRetry: () => void }) {
@@ -238,7 +282,7 @@ function App() {
   return <div className="app-shell">
     <aside className={`sidebar ${sidebarOpen ? 'is-open' : ''}`}><div className="sidebar-top"><Brand /><button className="close-sidebar" onClick={() => setSidebarOpen(false)}><X /></button></div><button className="collapse-button"><ChevronLeft size={18} /></button><nav>{sections.map(({ id, label, icon: Icon }) => <button className={activeId === id ? 'active' : ''} key={id} onClick={() => navigate(id)}><Icon size={20} /><span>{label}</span></button>)}</nav><div className="sidebar-bottom"><button onClick={() => navigate('configuracoes')}><Settings size={20} /><span>Configurações</span></button><div className="user-mini"><div className="avatar">{initials(userName)}</div><div><strong>{userName}</strong><span>{session.user.role ?? 'Usuário'}</span></div></div></div></aside>
     {sidebarOpen && <button className="sidebar-scrim" onClick={() => setSidebarOpen(false)} />}
-    <div className="workspace"><header className="topbar"><button className="menu-button" onClick={() => setSidebarOpen(true)}><Menu /></button><label className="search-box"><Search size={19} /><input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && activeId === 'dashboard') navigate('leads') }} placeholder="Buscar no módulo atual…" />{query && <button onClick={() => setQuery('')}><X size={16} /></button>}</label><div className="top-actions"><button className="notification" onClick={() => navigate('fluxo')}><Bell size={19} /></button><button className="profile-button" onClick={() => navigate('configuracoes')}>{initials(userName)}</button></div></header>
+    <div className="workspace"><header className="topbar"><button className="menu-button" onClick={() => setSidebarOpen(true)}><Menu /></button><label className="search-box"><Search size={19} /><input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && activeId === 'dashboard') navigate('leads') }} placeholder="Buscar no módulo atual…" />{query && <button onClick={() => setQuery('')}><X size={16} /></button>}</label><div className="top-actions"><TopbarNotifications refreshKey={refreshKey} onOpenAgenda={() => navigate('agenda')} /><button className="profile-button" onClick={() => navigate('configuracoes')}>{initials(userName)}</button></div></header>
       <main>{activeId === 'dashboard' ? <Dashboard refreshKey={refreshKey} /> : activeId === 'agenda' ? <CalendarPage refreshKey={refreshKey} /> : activeId === 'atendimentos' ? <AttendancesPage session={session} refreshKey={refreshKey} /> : activeId === 'leads' ? <LeadsPage search={search} refreshKey={refreshKey} /> : activeId === 'oportunidades' ? <OpportunitiesPage search={search} refreshKey={refreshKey} /> : activeId === 'fluxo' ? <OperationalFlow refreshKey={refreshKey} onNavigate={navigate} /> : endpoints[activeId] ? <ResourcePage section={activeSection} search={search} refreshKey={refreshKey} /> : activeId === 'relatorios' ? <Reports refreshKey={refreshKey} /> : <SettingsPage session={session} onSessionChange={setSession} onLogout={logout} />}</main>
     </div>
   </div>

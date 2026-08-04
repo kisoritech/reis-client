@@ -189,11 +189,30 @@ h1, h2, h3 { text-wrap: balance; }
 .search-box button { border: 0; background: none; cursor: pointer; }
 .top-actions { margin-left: auto; display: flex; align-items: center; gap: 18px; }
 .notification, .profile-button { position: relative; border: 0; cursor: pointer; }
-.notification { background: none; color: var(--muted); }
+.notification { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 10px; background: none; color: var(--muted); }
+.notification:hover, .notification.has-events { color: var(--gold-bright); background: var(--gold-dark); }
 .notification i {
-  position: absolute; right: -2px; top: -2px; width: 10px; height: 10px;
-  border: 2px solid #17170e; border-radius: 50%; background: var(--gold);
+  position: absolute; right: -4px; top: -5px; min-width: 18px; height: 18px; padding: 0 4px;
+  display: grid; place-items: center; border: 2px solid var(--topbar); border-radius: 10px;
+  color: var(--on-gold); background: var(--gold); font-size: 10px; font-style: normal; font-weight: 800;
 }
+.notification-center { position: relative; }
+.notification-popover { position: absolute; z-index: 30; top: calc(100% + 14px); right: -52px; width: min(380px, calc(100vw - 24px)); overflow: hidden; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: 0 18px 48px rgba(0,0,0,.35); }
+.notification-popover > header { padding: 16px 17px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--border); }
+.notification-popover > header div { display: grid; gap: 3px; }
+.notification-popover > header span { color: var(--muted); font-size: 12px; text-transform: capitalize; }
+.notification-popover > header button { width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 8px; color: var(--muted); background: var(--hover-bg); cursor: pointer; }
+.notification-list { max-height: 340px; overflow-y: auto; }
+.notification-list > button { width: 100%; padding: 14px 16px; display: grid; grid-template-columns: 62px minmax(0,1fr); gap: 10px; border: 0; border-bottom: 1px solid var(--border); color: var(--text); background: transparent; cursor: pointer; text-align: left; }
+.notification-list > button:hover { background: var(--hover-bg); }
+.notification-list > button.finished { opacity: .55; }
+.notification-time { display: flex; align-items: center; gap: 5px; color: var(--gold-bright); font-size: 13px; }
+.notification-title { min-width: 0; display: grid; gap: 4px; }
+.notification-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notification-title small { display: flex; align-items: center; gap: 4px; color: var(--muted); }
+.notification-empty { padding: 30px 18px; color: var(--muted); text-align: center; }
+.notification-empty.error { color: var(--danger-text); }
+.notification-footer { width: 100%; min-height: 45px; border: 0; color: var(--gold-bright); background: var(--gold-dark); cursor: pointer; font-weight: 700; }
 .menu-button { display: none; border: 0; background: none; cursor: pointer; }
 
 main { padding: 35px; max-width: 1650px; margin: 0 auto; }
@@ -330,6 +349,8 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
 .settings-section-heading { margin-bottom: 28px; }
 .settings-section-heading h2 { margin: 0 0 5px; font-size: 24px; }
 .settings-section-heading p { margin: 0; color: var(--muted); }
+.settings-section-heading.users-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.settings-section-heading.users-heading .gold-button { flex: 0 0 auto; }
 .settings-message { margin-bottom: 20px; padding: 11px 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 14px; }
 .settings-message.success { color: var(--success); background: rgba(0,232,121,.06); }
 .settings-message.error { color: var(--danger-text); border-color: var(--danger-border); background: var(--danger-bg); }
@@ -380,12 +401,21 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
 .users-table th, .users-table td { padding: 13px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: middle; }
 .users-table th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
 .users-table tbody tr:last-child td { border-bottom: 0; }
-.users-table input { width: 100%; min-width: 120px; height: 37px; padding: 0 9px; border: 1px solid var(--gold); border-radius: 8px; color: var(--text); background: var(--input-bg); }
+.users-table input, .users-table select { width: 100%; min-width: 120px; height: 37px; padding: 0 9px; border: 1px solid var(--gold); border-radius: 8px; color: var(--text); background: var(--input-bg); }
 .user-row-actions { display: flex; justify-content: flex-end; gap: 6px; }
 .user-row-actions .icon-button.destructive { color: var(--danger-text); }
 .user-status { display: inline-flex; padding: 4px 8px; border-radius: 99px; font-size: 12px; }
 .user-status.active { color: var(--success); background: rgba(0,232,121,.08); }
 .user-status.inactive { color: var(--danger-text); background: var(--danger-bg); }
+.cargo-manager { margin-top: 24px; padding: 20px; border: 1px solid var(--border); border-radius: 14px; }
+.cargo-manager h3, .cargo-manager p { margin: 0 0 5px; }
+.cargo-manager p, .cargo-list small { color: var(--muted); }
+.cargo-manager form { margin: 16px 0; display: grid; grid-template-columns: 1fr 1.5fr auto; gap: 10px; }
+.cargo-manager form input { min-width: 0; height: 40px; padding: 0 11px; border: 1px solid var(--border); border-radius: 9px; color: var(--text); background: var(--input-bg); }
+.cargo-list { display: grid; gap: 8px; }
+.cargo-list > div { padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; border-radius: 9px; background: var(--hover-bg); }
+.cargo-list span { display: grid; gap: 2px; }
+.cargo-list span + div { display: flex; gap: 5px; }
 .help-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .help-grid > button { min-height: 88px; padding: 16px 18px; display: flex; align-items: center; gap: 15px; border: 1px solid var(--border); border-radius: 18px; color: var(--text); background: transparent; cursor: pointer; text-align: left; }
 .help-grid > button:disabled { opacity: .55; cursor: default; }
