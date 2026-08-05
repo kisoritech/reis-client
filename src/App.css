@@ -590,6 +590,31 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
 .review-notes p { margin: 7px 0 0; color: var(--muted); line-height: 1.55; }
 
 :root[data-density="compact"] .settings-block { margin-bottom: 12px; padding: 14px; }
+.campaign-heading-actions, .campaign-action-grid, .dialog-actions { display: flex; align-items: center; gap: 10px; }
+.campaign-heading-actions button, .campaign-action-grid button, .campaign-start, .dialog-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.provider-banner { margin-bottom: 20px; padding: 16px 18px; display: flex; align-items: center; gap: 13px; border: 1px solid var(--border); border-radius: 14px; }
+.provider-banner.ready { color: var(--success); background: rgba(0,232,121,.06); }
+.provider-banner.blocked { color: var(--danger-text); border-color: var(--danger-border); background: var(--danger-bg); }
+.provider-banner div { display: grid; gap: 3px; }
+.provider-banner span { color: var(--muted); font-size: 13px; }
+.campaign-metrics { margin-bottom: 20px; display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; }
+.campaign-metrics article { padding: 18px; display: grid; gap: 6px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+.campaign-metrics span { color: var(--muted); font-size: 13px; }
+.campaign-metrics strong { font-size: 26px; }
+.campaign-list-panel { min-height: 280px; }
+.campaign-dialog { width: min(760px, calc(100vw - 32px)); }
+.campaign-safety { margin: 15px 0; padding: 14px; display: flex; align-items: flex-start; gap: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--gold-dark); }
+.campaign-safety p { margin: 3px 0 0; color: var(--muted); line-height: 1.45; }
+.campaign-action-grid { margin: 16px 0; flex-wrap: wrap; }
+.campaign-json { max-height: 240px; padding: 14px; overflow: auto; border: 1px solid var(--border); border-radius: 10px; color: var(--text); background: var(--input-bg); font-size: 12px; white-space: pre-wrap; }
+.campaign-consent { margin: 18px 0; padding: 14px; display: flex !important; align-items: flex-start; gap: 10px !important; border: 1px solid var(--border); border-radius: 10px; line-height: 1.45; }
+.campaign-consent input { width: 17px !important; min-height: 17px !important; accent-color: var(--gold); }
+.campaign-schedule { margin-top: 16px; display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 10px; }
+.campaign-schedule label { display: grid; gap: 7px; color: var(--muted); font-size: 13px; }
+.campaign-schedule input { min-height: 42px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 9px; color: var(--text); background: var(--input-bg); }
+.campaign-schedule button { min-height: 42px; display: inline-flex; align-items: center; gap: 7px; }
+.campaign-start { width: 100%; }
+.outline-button.destructive { color: var(--danger-text); border-color: var(--danger-border); }
 :root[data-density="compact"] .metric-card, :root[data-density="compact"] .panel { padding: 18px; }
 :root[data-density="comfortable"] .settings-block { margin-bottom: 26px; padding: 26px; }
 :root[data-theme="light"] {
@@ -685,4 +710,8 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
   .attendance-fields .full-field { grid-column: auto; }
   .attendance-review { grid-template-columns: 1fr; }
   .attendance-review > div { border-right: 0; }
+  .campaign-heading-actions { width: 100%; flex-wrap: wrap; }
+  .campaign-metrics { grid-template-columns: 1fr; }
+  .campaign-action-grid button { flex: 1 1 45%; }
+  .campaign-schedule { grid-template-columns: 1fr; }
 }
