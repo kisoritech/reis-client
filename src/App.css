@@ -522,19 +522,23 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
 .selected-schedule { margin-top: 20px; }
 .selected-schedule .panel-heading > button { border: 0; color: var(--gold); background: none; cursor: pointer; }
 .schedule-list { display: grid; margin-top: 18px; }
-.schedule-list > button { min-height: 67px; padding: 10px 12px; display: grid; grid-template-columns: 5px 90px minmax(0, 1fr) auto; align-items: center; gap: 14px; border: 0; border-bottom: 1px solid var(--border); color: var(--text); background: transparent; cursor: pointer; text-align: left; }
+.schedule-list > button { min-height: 67px; padding: 10px 12px; display: grid; grid-template-columns: 5px 90px minmax(0, 1fr) auto auto; align-items: center; gap: 14px; border: 0; border-bottom: 1px solid var(--border); color: var(--text); background: transparent; cursor: pointer; text-align: left; }
 .schedule-list > button:hover { background: var(--hover-bg); }
 .schedule-marker { width: 5px; height: 36px; border-radius: 99px; background: var(--gold); }
 .schedule-marker.event-realizado { background: var(--success); }
 .schedule-marker.event-cancelado, .schedule-marker.event-nao_compareceu { background: #ef493c; }
 .schedule-date, .schedule-title { min-width: 0; display: grid; gap: 3px; }
 .schedule-date small, .schedule-title small { overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.google-sync-indicator { width: 27px; height: 27px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 50%; color: var(--muted); }
+.google-sync-indicator.synced { color: var(--success); border-color: color-mix(in srgb, var(--success) 40%, transparent); background: color-mix(in srgb, var(--success) 10%, transparent); }
+.google-sync-indicator.pending { color: #d79b2e; border-color: rgba(215,155,46,.38); background: rgba(215,155,46,.1); }
 .calendar-dialog { width: min(720px, 100%); }
 .calendar-dialog .panel-heading p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
 .dialog-fields .full-field { grid-column: 1 / -1; }
 .dialog-fields textarea { padding: 11px 13px; resize: vertical; border: 1px solid var(--border); border-radius: 10px; color: var(--text); background: var(--input-bg); font: inherit; }
 .dialog-fields .check-label { display: flex; align-items: center; grid-template-columns: auto 1fr; gap: 9px; }
 .dialog-fields .check-label input { width: 16px; height: 16px; accent-color: var(--gold); }
+.dialog-fields .field-help { margin-top: -8px; color: var(--muted); font-size: 12px; line-height: 1.45; }
 .event-details .panel-heading > div { display: grid; gap: 10px; }
 .event-details .status-chip { width: max-content; }
 .event-details dl { display: grid; gap: 16px; margin: 18px 0; }
@@ -669,7 +673,7 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
   .calendar-period h2 { margin-left: auto; font-size: 17px; }
   .calendar-grid-wrap { overflow-x: auto; }
   .calendar-weekdays, .calendar-grid { min-width: 840px; }
-  .schedule-list > button { grid-template-columns: 5px 70px minmax(0, 1fr); }
+  .schedule-list > button { grid-template-columns: 5px 70px minmax(0, 1fr) auto; }
   .schedule-list .status-chip { display: none; }
   .dialog-fields .full-field { grid-column: auto; }
   .attendance-list-toolbar { align-items: stretch; flex-direction: column; }

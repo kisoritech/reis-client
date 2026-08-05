@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
-  CalendarDays, ChevronLeft, ChevronRight, Clock3, List, MapPin,
-  Plus, RefreshCw, X,
+  CalendarCheck2, CalendarDays, ChevronLeft, ChevronRight, Clock3, List, MapPin,
+  Plus, RefreshCw, TriangleAlert, X,
 } from 'lucide-react'
 import { apiRequest, mutationKey } from './api'
 
@@ -17,6 +17,12 @@ type CalendarEvent = {
   status?: string
   diaInteiro?: boolean
   googleSyncEnabled?: boolean
+  googleSync?: {
+    syncStatus?: string
+    googleEventId?: string
+    calendarId?: string
+    lastSyncedAt?: string | null
+  } | null
   responsavelId?: string
 }
 
@@ -134,12 +140,13 @@ export default function CalendarPage({ refreshKey }: { refreshKey: number }) {
 
 function EventList({ events, onSelect, compact = false }: { events: CalendarEvent[]; onSelect: (event: CalendarEvent) => void; compact?: boolean }) {
   if (!events.length) return <div className="empty">{compact ? 'Nenhum compromisso neste dia.' : 'Nenhum agendamento neste período.'}</div>
-  return <div className="schedule-list">{[...events].sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime()).map((event) => <button type="button" key={event.id} onClick={() => onSelect(event)}><span className={`schedule-marker event-${event.status ?? 'agendado'}`} /><span className="schedule-date"><strong>{new Date(event.inicio).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</strong><small>{formatTime(event.inicio)}–{formatTime(event.fim)}</small></span><span className="schedule-title"><strong>{event.titulo}</strong><small>{event.tipo ?? 'Compromisso'}{event.local ? ` · ${event.local}` : ''}</small></span><span className="status-chip">{statusLabel(event.status)}</span></button>)}</div>
+  return <div className="schedule-list">{[...events].sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime()).map((event) => <button type="button" key={event.id} onClick={() => onSelect(event)}><span className={`schedule-marker event-${event.status ?? 'agendado'}`} /><span className="schedule-date"><strong>{new Date(event.inicio).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</strong><small>{formatTime(event.inicio)}–{formatTime(event.fim)}</small></span><span className="schedule-title"><strong>{event.titulo}</strong><small>{event.tipo ?? 'Compromisso'}{event.local ? ` · ${event.local}` : ''}</small></span>{event.googleSyncEnabled && <span className={`google-sync-indicator ${event.googleSync?.syncStatus === 'synced' ? 'synced' : 'pending'}`} title={event.googleSync?.syncStatus === 'synced' ? 'Sincronizado com Google Agenda' : 'Sincronização com Google pendente'}>{event.googleSync?.syncStatus === 'synced' ? <CalendarCheck2 size={14} /> : <TriangleAlert size={14} />}</span>}<span className="status-chip">{statusLabel(event.status)}</span></button>)}</div>
 }
 
 function EventDetails({ event, onClose, onChanged }: { event: CalendarEvent; onClose: () => void; onChanged: () => void }) {
   const [working, setWorking] = useState(false)
   const [error, setError] = useState('')
+  const googleSynced = event.googleSyncEnabled && event.googleSync?.syncStatus === 'synced'
   const updateStatus = async (status: string) => {
     setWorking(true)
     setError('')
@@ -163,7 +170,18 @@ function EventDetails({ event, onClose, onChanged }: { event: CalendarEvent; onC
       setWorking(false)
     }
   }
-  return <div className="dialog-backdrop" role="presentation" onMouseDown={(click) => click.target === click.currentTarget && onClose()}><div className="dialog event-details"><div className="panel-heading"><div><span className="status-chip">{statusLabel(event.status)}</span><h2>{event.titulo}</h2></div><button type="button" className="icon-button" onClick={onClose}><X /></button></div><dl><div><dt><CalendarDays size={17} /> Data</dt><dd>{new Date(event.inicio).toLocaleDateString('pt-BR', { dateStyle: 'full' })}</dd></div><div><dt><Clock3 size={17} /> Horário</dt><dd>{formatTime(event.inicio)} às {formatTime(event.fim)}</dd></div>{event.local && <div><dt><MapPin size={17} /> Local</dt><dd>{event.local}</dd></div>}</dl>{event.descricao && <p>{event.descricao}</p>}{error && <div className="form-error">{error}</div>}<div className="dialog-actions"><button type="button" className="outline-button danger-action" disabled={working} onClick={() => void remove()}>Excluir</button>{event.status !== 'cancelado' && <button type="button" className="outline-button" disabled={working} onClick={() => void updateStatus('cancelado')}>Cancelar agenda</button>}{event.status !== 'realizado' && <button type="button" className="outline-button success-action" disabled={working} onClick={() => void updateStatus('realizado')}>Marcar realizado</button>}<button type="button" className="gold-button" disabled={working} onClick={onClose}>Fechar</button></div></div></div>
+  const retryGoogle = async () => {
+    setWorking(true)
+    setError('')
+    try {
+      await apiRequest({ method: 'POST', path: `/calendar/events/${event.id}/google-sync`, body: {}, idempotencyKey: mutationKey() })
+      onChanged()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível sincronizar novamente com o Google Agenda')
+      setWorking(false)
+    }
+  }
+  return <div className="dialog-backdrop" role="presentation" onMouseDown={(click) => click.target === click.currentTarget && onClose()}><div className="dialog event-details"><div className="panel-heading"><div><span className="status-chip">{statusLabel(event.status)}</span><h2>{event.titulo}</h2></div><button type="button" className="icon-button" onClick={onClose} aria-label="Fechar detalhes"><X /></button></div><dl><div><dt><CalendarDays size={17} /> Data</dt><dd>{new Date(event.inicio).toLocaleDateString('pt-BR', { dateStyle: 'full' })}</dd></div><div><dt><Clock3 size={17} /> Horário</dt><dd>{formatTime(event.inicio)} às {formatTime(event.fim)}</dd></div>{event.local && <div><dt><MapPin size={17} /> Local</dt><dd>{event.local}</dd></div>}{event.googleSyncEnabled && <div><dt>{googleSynced ? <CalendarCheck2 size={17} /> : <TriangleAlert size={17} />} Google Agenda</dt><dd>{googleSynced ? `Sincronizado${event.googleSync?.lastSyncedAt ? ` em ${new Date(event.googleSync.lastSyncedAt).toLocaleString('pt-BR')}` : ''}` : 'Sincronização pendente'}</dd></div>}</dl>{event.descricao && <p>{event.descricao}</p>}{error && <div className="form-error" role="alert">{error}</div>}<div className="dialog-actions"><button type="button" className="outline-button danger-action" disabled={working} onClick={() => void remove()}>Excluir</button>{event.googleSyncEnabled && !googleSynced && <button type="button" className="outline-button" disabled={working} onClick={() => void retryGoogle()}>{working ? 'Sincronizando…' : 'Sincronizar novamente'}</button>}{event.status !== 'cancelado' && <button type="button" className="outline-button" disabled={working} onClick={() => void updateStatus('cancelado')}>Cancelar agenda</button>}{event.status !== 'realizado' && <button type="button" className="outline-button success-action" disabled={working} onClick={() => void updateStatus('realizado')}>Marcar realizado</button>}<button type="button" className="gold-button" disabled={working} onClick={onClose}>Fechar</button></div></div></div>
 }
 
 function NewEventDialog({ initialDate, onClose, onCreated }: { initialDate: string; onClose: () => void; onCreated: () => void }) {
@@ -203,5 +221,5 @@ function NewEventDialog({ initialDate, onClose, onCreated }: { initialDate: stri
   }
   const start = `${initialDate}T09:00`
   const end = `${initialDate}T10:00`
-  return <div className="dialog-backdrop" role="presentation" onMouseDown={(click) => click.target === click.currentTarget && onClose()}><form className="dialog calendar-dialog" onSubmit={submit}><div className="panel-heading"><div><h2>Novo agendamento</h2><p>Registre o compromisso no cronograma da equipe.</p></div><button type="button" className="icon-button" onClick={onClose}><X /></button></div><div className="dialog-fields"><label className="full-field">Título<input name="title" required autoFocus /></label><label>Tipo<select name="type" defaultValue="reuniao">{eventTypes.map((type) => <option value={type} key={type}>{type}</option>)}</select></label><label>Status<select name="status" defaultValue="agendado">{statuses.map((status) => <option value={status} key={status}>{statusLabel(status)}</option>)}</select></label><label>Início<input name="start" type="datetime-local" defaultValue={start} required /></label><label>Fim<input name="end" type="datetime-local" defaultValue={end} required /></label><label>Local<input name="location" /></label><label>Lembrete<select name="reminder" defaultValue="30"><option value="0">Sem lembrete</option><option value="15">15 minutos antes</option><option value="30">30 minutos antes</option><option value="60">1 hora antes</option><option value="1440">1 dia antes</option></select></label><label className="full-field">Descrição<textarea name="description" rows={3} /></label><label className="check-label"><input name="allDay" type="checkbox" /> Dia inteiro</label><label className="check-label"><input name="googleSync" type="checkbox" /> Sincronizar com Google Calendar</label></div>{error && <div className="form-error">{error}</div>}<div className="dialog-actions"><button type="button" className="outline-button" onClick={onClose}>Cancelar</button><button className="gold-button" disabled={saving}>{saving ? 'Agendando…' : 'Criar agendamento'}</button></div></form></div>
+  return <div className="dialog-backdrop" role="presentation" onMouseDown={(click) => click.target === click.currentTarget && onClose()}><form className="dialog calendar-dialog" onSubmit={submit} aria-busy={saving}><div className="panel-heading"><div><h2>Novo agendamento</h2><p>Registre o compromisso no cronograma da equipe.</p></div><button type="button" className="icon-button" onClick={onClose} aria-label="Fechar formulário"><X /></button></div><div className="dialog-fields"><label className="full-field">Título<input name="title" required autoFocus /></label><label>Tipo<select name="type" defaultValue="reuniao">{eventTypes.map((type) => <option value={type} key={type}>{type}</option>)}</select></label><label>Status<select name="status" defaultValue="agendado">{statuses.map((status) => <option value={status} key={status}>{statusLabel(status)}</option>)}</select></label><label>Início<input name="start" type="datetime-local" defaultValue={start} required /></label><label>Fim<input name="end" type="datetime-local" defaultValue={end} required /></label><label>Local<input name="location" /></label><label>Lembrete<select name="reminder" defaultValue="30"><option value="0">Sem lembrete</option><option value="15">15 minutos antes</option><option value="30">30 minutos antes</option><option value="60">1 hora antes</option><option value="1440">1 dia antes</option></select></label><label className="full-field">Descrição<textarea name="description" rows={3} /></label><label className="check-label"><input name="allDay" type="checkbox" /> Dia inteiro</label><label className="check-label"><input name="googleSync" type="checkbox" aria-describedby="google-sync-help" /> Sincronizar com Google Agenda</label><small id="google-sync-help" className="field-help full-field">Quando ativado, o evento será criado, atualizado e excluído também no calendário Google conectado ao seu usuário.</small></div>{error && <div className="form-error" role="alert">{error}</div>}<div className="dialog-actions"><button type="button" className="outline-button" disabled={saving} onClick={onClose}>Cancelar</button><button className="gold-button" disabled={saving}>{saving ? 'Salvando e sincronizando…' : 'Criar agendamento'}</button></div></form></div>
 }
