@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   Bell, CircleHelp, Database, Globe2, HelpCircle, LockKeyhole,
@@ -167,7 +167,7 @@ function ProfileSettings({ session, onSessionChange, onMessage }: {
   return <div><header className="settings-section-heading"><h2>Perfil & Conta</h2><p>Informações pessoais e preferências de conta.</p></header>
     <div className="profile-summary"><div className="profile-avatar">{name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()}</div><div><strong>{name}</strong><span>{session.user.email}</span><small>{session.user.role ?? 'Usuário'}</small></div></div>
     {!canUpdate && <Message kind="info">Seu perfil permite consultar estes dados, mas não alterá-los.</Message>}
-    <form className="settings-form" onSubmit={submit}><label>Nome completo<input name="name" defaultValue={name} required disabled={!canUpdate} /></label><label>E-mail<input name="email" type="email" defaultValue={session.user.email} disabled title="A alteração de e-mail exige confirmação pelo provedor de autenticação" /></label><label>Telefone<input name="phone" type="tel" defaultValue={session.user.phone ?? ''} placeholder="+55 (11) 99999-0000" disabled={!canUpdate} /></label><label>Empresa<input value={session.user.companyId ?? 'Empresa vinculada à sessão'} disabled /></label><label>Cargo<input value={session.user.role ?? 'Usuário'} disabled /></label><label>Fuso horário<input value="America/Sao_Paulo" disabled /></label><p className="settings-note full-field">O e-mail de acesso só poderá ser alterado quando a API sincronizar a mudança com o provedor de autenticação.</p><button className="gold-button" disabled={saving || !canUpdate}>{saving ? 'Salvando…' : 'Salvar alterações'}</button></form>
+    <form className="settings-form" onSubmit={submit}><label>Nome completo<input name="name" defaultValue={name} required disabled={!canUpdate} /></label><label>E-mail<input name="email" type="email" defaultValue={session.user.email} disabled title="A alteração de e-mail exige confirmação pelo provedor de autenticação" /></label><label>Telefone<input name="phone" type="tel" defaultValue={session.user.phone ?? ''} placeholder="+55 (11) 99999-0000" disabled={!canUpdate} /></label><label>Empresa<input value={session.user.companyId ?? 'Empresa vinculada à sessão'} disabled /></label><label>Cargo<input value={session.user.role ?? 'Usuário'} disabled /></label><label>Fuso horário<input value="America/Sao_Paulo" disabled /></label><p className="settings-note full-field">O e-mail de acesso só poderá ser alterado quando a API sincronizar a mudança com o provedor de autenticação.</p><button className="gold-button profile-save-button" disabled={saving || !canUpdate}>{saving ? 'Salvando…' : 'Salvar alterações'}</button></form>
   </div>
 }
 
@@ -354,27 +354,75 @@ function IntegrationSettings({ onMessage }: { onMessage: (message: { kind: 'succ
   const [google, setGoogle] = useState<Record<string, unknown> | null>(null)
   const [whatsapp, setWhatsapp] = useState<Record<string, unknown> | null>(null)
   const [loading, setLoading] = useState(true)
+  const [connectingGoogle, setConnectingGoogle] = useState(false)
+  const [googleVerificationError, setGoogleVerificationError] = useState('')
+  const connectionAttempt = useRef(0)
+  const verifyGoogle = async () => {
+    try {
+      const result = await apiRequest<Record<string, unknown>>({ method: 'GET', path: '/integrations/google/calendar/verify' })
+      setGoogle((current) => ({ ...current, ...result.data, status: 'active' }))
+      setGoogleVerificationError('')
+      return true
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Não foi possível validar o calendário no Google.'
+      setGoogleVerificationError(message)
+      return false
+    }
+  }
   const load = async () => {
     setLoading(true)
     const [googleResult, whatsappResult] = await Promise.allSettled([
       apiRequest<Record<string, unknown> | null>({ method: 'GET', path: '/integrations/google/calendar/status' }),
       apiRequest<Record<string, unknown>>({ method: 'GET', path: '/automation/messages/provider/status' }),
     ])
-    setGoogle(googleResult.status === 'fulfilled' ? googleResult.value.data : null)
+    const googleStatus = googleResult.status === 'fulfilled' ? googleResult.value.data : null
+    setGoogle(googleStatus)
     setWhatsapp(whatsappResult.status === 'fulfilled' ? whatsappResult.value.data : null)
+    if (googleStatus?.status === 'active' && !await verifyGoogle()) {
+      onMessage({ kind: 'error', text: 'A conexão está salva, mas o Google recusou o acesso ao calendário. Reconecte a conta.' })
+    }
     setLoading(false)
   }
-  useEffect(() => { void load() }, [])
+  useEffect(() => {
+    void load()
+    return () => { connectionAttempt.current += 1 }
+  }, [])
   const connectGoogle = async () => {
+    const attempt = ++connectionAttempt.current
+    setConnectingGoogle(true)
     try {
       const result = await apiRequest<{ authorizationUrl: string }>({ method: 'POST', path: '/integrations/google/calendar/connect', body: {}, idempotencyKey: mutationKey() })
       await openExternal(result.data.authorizationUrl)
       onMessage({ kind: 'info', text: 'Conclua a autorização no navegador e retorne ao REIS.' })
+      for (let check = 0; check < 60; check += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 2_000))
+        if (connectionAttempt.current !== attempt) return
+        try {
+          const status = await apiRequest<Record<string, unknown> | null>({ method: 'GET', path: '/integrations/google/calendar/status' })
+          setGoogle(status.data)
+          if (status.data?.status === 'active') {
+            if (await verifyGoogle()) {
+              setConnectingGoogle(false)
+              onMessage({ kind: 'success', text: 'Google Calendar conectado e validado com sucesso.' })
+              return
+            }
+          }
+        } catch {
+          // A API pode ficar momentaneamente indisponível enquanto o OAuth é concluído.
+        }
+      }
+      if (connectionAttempt.current === attempt) {
+        setConnectingGoogle(false)
+        onMessage({ kind: 'info', text: 'A autorização ainda não foi confirmada. Tente conectar novamente.' })
+      }
     } catch (error) {
+      if (connectionAttempt.current === attempt) setConnectingGoogle(false)
       onMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Falha ao conectar Google Calendar.' })
     }
   }
   const disconnectGoogle = async () => {
+    connectionAttempt.current += 1
+    setConnectingGoogle(false)
     try {
       await apiRequest({ method: 'POST', path: '/integrations/google/calendar/disconnect', body: {}, idempotencyKey: mutationKey() })
       await load()
@@ -384,16 +432,17 @@ function IntegrationSettings({ onMessage }: { onMessage: (message: { kind: 'succ
     }
   }
   const googleConnected = google?.status === 'active'
+  const googleVerified = googleConnected && !googleVerificationError && google?.status === 'active'
   const whatsappConnected = Boolean((whatsapp?.whatsapp as Record<string, unknown> | undefined)?.enabled)
   const items = [
-    { name: 'Google Calendar', connected: googleConnected, detail: String(google?.googleAccountEmail ?? ''), action: googleConnected ? disconnectGoogle : connectGoogle },
+    { name: 'Google Calendar', connected: googleVerified, detail: googleVerificationError || [google?.googleAccountEmail, google?.calendarSummary].filter(Boolean).join(' · '), action: googleConnected ? disconnectGoogle : connectGoogle, actionLabel: connectingGoogle ? 'Aguardando Google…' : undefined, disabled: connectingGoogle },
     { name: 'WhatsApp Business', connected: whatsappConnected, detail: whatsappConnected ? 'Provider ativo na API' : 'Provider não configurado' },
     { name: 'Slack', connected: false, detail: 'Integração ainda não disponível' },
     { name: 'Zapier', connected: false, detail: 'Integração ainda não disponível' },
     { name: 'HubSpot', connected: false, detail: 'Integração ainda não disponível' },
     { name: 'RD Station', connected: false, detail: 'Integração ainda não disponível' },
   ]
-  return <div><header className="settings-section-heading"><h2>Integrações</h2><p>Conecte ferramentas e automatize seu fluxo.</p></header>{loading ? <div className="settings-loading">Consultando integrações na API…</div> : <div className="integration-grid">{items.map((item) => <article className="integration-card" key={item.name}><div className="integration-logo"><PlugZap size={20} /></div><div><strong>{item.name}</strong><span className={item.connected ? 'connected' : ''}>{item.connected ? 'Conectado' : item.detail}</span>{item.connected && item.detail && <small>{item.detail}</small>}</div><button type="button" className="outline-button" disabled={!item.action} onClick={item.action}>{item.action ? item.connected ? 'Desconectar' : 'Conectar' : 'Indisponível'}</button></article>)}</div>}</div>
+  return <div><header className="settings-section-heading"><h2>Integrações</h2><p>Conecte ferramentas e automatize seu fluxo.</p></header>{loading ? <div className="settings-loading">Consultando integrações na API…</div> : <div className="integration-grid">{items.map((item) => <article className="integration-card" key={item.name}><div className="integration-logo"><PlugZap size={20} /></div><div><strong>{item.name}</strong><span className={item.connected ? 'connected' : ''}>{item.connected ? 'Conectado' : item.detail}</span>{item.connected && item.detail && <small>{item.detail}</small>}</div><button type="button" className="outline-button" disabled={!item.action || item.disabled} onClick={item.action}>{item.actionLabel ?? (item.action ? item.connected ? 'Desconectar' : 'Conectar' : 'Indisponível')}</button></article>)}</div>}</div>
 }
 
 function PrivacySettings({ session, onLogout, onMessage }: { session: PublicSession; onLogout: () => Promise<void>; onMessage: (message: { kind: 'success' | 'error' | 'info'; text: string }) => void }) {
