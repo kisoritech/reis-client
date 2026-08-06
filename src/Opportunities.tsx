@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
-  ArrowRight, CalendarClock, CheckCircle2, CircleDollarSign, Flame,
+  ArrowRight, CalendarClock, CheckCircle2, CircleDollarSign, ClipboardList, Flame,
   Plus, RefreshCw, Target, TrendingUp, UserRound, X,
 } from 'lucide-react'
 import { apiRequest, mutationKey } from './api'
@@ -9,6 +9,7 @@ import { apiRequest, mutationKey } from './api'
 type Page<T> = { items: T[]; page: number; limit?: number; total: number; totalPages: number }
 type Account = { id: string; nome?: string; name?: string; email?: string; telefone?: string }
 type User = { id: string; nome?: string; name?: string; email?: string; ativo?: boolean }
+type Attendance = { id: string; status?: string; createdAt?: string; cliente?: Account; tipoAtendimento?: { id?: string; nome?: string }; empreendimento?: { id?: string; nome?: string } }
 type Deal = {
   id: string
   titulo?: string
@@ -26,6 +27,8 @@ type Deal = {
   lead?: { cliente?: Account }
   pipelineStage?: { id: string; nome: string }
   responsavel?: User
+  atendimentoId?: string
+  atendimento?: Attendance
 }
 
 const statuses = [
@@ -56,10 +59,26 @@ function accountName(deal: Deal) {
   return deal.lead?.cliente?.nome ?? deal.lead?.cliente?.name ?? 'Cliente não vinculado'
 }
 
-export default function OpportunitiesPage({ search, refreshKey }: { search: string; refreshKey: number }) {
+function accountId(deal: Deal) { return deal.lead?.cliente?.id }
+function attendanceStatus(attendance?: Attendance) {
+  if (!attendance) return 'Sem atendimento'
+  const value = String(attendance.status ?? 'aberto').toLowerCase()
+  if (['concluido', 'concluído'].includes(value)) return 'Concluído'
+  if (value === 'cancelado') return 'Cancelado'
+  return 'Em atendimento'
+}
+function latestAttendance(deal: Deal, attendances: Attendance[]) {
+  if (deal.atendimento) return deal.atendimento
+  const direct = attendances.find((item) => item.id === deal.atendimentoId)
+  if (direct) return direct
+  return attendances.filter((item) => item.cliente?.id === accountId(deal)).sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime())[0]
+}
+
+export default function OpportunitiesPage({ search, refreshKey, onNavigate }: { search: string; refreshKey: number; onNavigate: (target: string) => void }) {
   const [data, setData] = useState<Page<Deal> | null>(null)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [users, setUsers] = useState<User[]>([])
+  const [attendances, setAttendances] = useState<Attendance[]>([])
   const [status, setStatus] = useState<(typeof statuses)[number]['id']>('ALL')
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
@@ -82,12 +101,17 @@ export default function OpportunitiesPage({ search, refreshKey }: { search: stri
       apiRequest<Page<Deal>>({ method: 'GET', path: `/crm/deals?${query}` }),
       apiRequest<Page<Account>>({ method: 'GET', path: '/crm/accounts?page=1&limit=100' }),
       apiRequest<User[]>({ method: 'GET', path: '/organizacao/usuarios' }),
-    ]).then(([dealsResult, accountsResult, usersResult]) => {
+      apiRequest<{ items: Attendance[] } | Attendance[]>({ method: 'GET', path: '/crm/atendimentos?limit=100' }),
+    ]).then(([dealsResult, accountsResult, usersResult, attendancesResult]) => {
       if (!current) return
       if (dealsResult.status === 'fulfilled') setData(dealsResult.value.data)
       else setError(dealsResult.reason instanceof Error ? dealsResult.reason.message : 'Falha ao carregar oportunidades')
       if (accountsResult.status === 'fulfilled') setAccounts(accountsResult.value.data.items)
       if (usersResult.status === 'fulfilled') setUsers(usersResult.value.data.filter((user) => user.ativo !== false))
+      if (attendancesResult.status === 'fulfilled') {
+        const value = attendancesResult.value.data
+        setAttendances(Array.isArray(value) ? value : value.items)
+      }
     }).finally(() => current && setLoading(false))
     return () => { current = false }
   }, [page, refreshKey, search, status, version])
@@ -125,19 +149,21 @@ export default function OpportunitiesPage({ search, refreshKey }: { search: stri
       <div className="opportunity-toolbar"><div className="opportunity-status-tabs">{statuses.map((item) => <button type="button" key={item.id} className={status === item.id ? 'active' : ''} onClick={() => setStatus(item.id)}>{item.label}</button>)}</div><button type="button" onClick={reload}><RefreshCw size={16} /> Atualizar</button></div>
       {loading && <div className="state-panel"><RefreshCw className="spin" /><span>Consultando pipeline…</span></div>}
       {error && <div className="state-panel error"><strong>Não foi possível carregar</strong><span>{error}</span><button onClick={reload}>Tentar novamente</button></div>}
-      {!loading && !error && <div className="table-scroll"><table className="data-table opportunity-table"><thead><tr><th>Oportunidade</th><th>Cliente</th><th>Etapa</th><th>Valor</th><th>Probabilidade</th><th>Próxima ação</th><th>Previsão</th><th>Status</th></tr></thead><tbody>
-        {(data?.items ?? []).map((deal) => <tr key={deal.id} onClick={() => void openDeal(deal.id)}><td><strong>{deal.titulo ?? 'Sem título'}</strong><small>{deal.temperatura ? `Temperatura: ${deal.temperatura}` : 'Sem temperatura'}</small></td><td>{accountName(deal)}</td><td>{deal.pipelineStage?.nome ?? 'Não classificada'}</td><td className="potential">{brl(deal.valor)}</td><td><div className="opportunity-probability"><span>{deal.probabilidade ?? 0}%</span><i><b style={{ width: `${Math.max(0, Math.min(100, deal.probabilidade ?? 0))}%` }} /></i></div></td><td>{deal.proximaAcao ?? 'Definir próximo passo'}</td><td>{shortDate(deal.dataFechamentoEsperada)}</td><td><span className={`status-chip deal-${deal.status ?? 'aberta'}`}>{statusLabel(deal.status)}</span></td></tr>)}
+      {!loading && !error && <div className="table-scroll"><table className="data-table opportunity-table"><thead><tr><th>Oportunidade</th><th>Cliente</th><th>Atendimento</th><th>Etapa</th><th>Valor</th><th>Probabilidade</th><th>Próxima ação</th><th>Previsão</th><th>Status</th></tr></thead><tbody>
+        {(data?.items ?? []).map((deal) => { const attendance = latestAttendance(deal, attendances); return <tr key={deal.id} onClick={() => void openDeal(deal.id)}><td><strong>{deal.titulo ?? 'Sem título'}</strong><small>{deal.temperatura ? `Temperatura: ${deal.temperatura}` : 'Sem temperatura'}</small></td><td>{accountName(deal)}</td><td><span className={`attendance-flow-status ${attendance ? String(attendance.status ?? 'aberto').toLowerCase() : 'missing'}`}>{attendanceStatus(attendance)}</span></td><td>{deal.pipelineStage?.nome ?? 'Não classificada'}</td><td className="potential">{brl(deal.valor)}</td><td><div className="opportunity-probability"><span>{deal.probabilidade ?? 0}%</span><i><b style={{ width: `${Math.max(0, Math.min(100, deal.probabilidade ?? 0))}%` }} /></i></div></td><td>{deal.proximaAcao ?? 'Definir próximo passo'}</td><td>{shortDate(deal.dataFechamentoEsperada)}</td><td><span className={`status-chip deal-${deal.status ?? 'aberta'}`}>{statusLabel(deal.status)}</span></td></tr> })}
       </tbody></table>{!data?.items.length && <div className="empty">Nenhuma oportunidade corresponde aos filtros.</div>}</div>}
       {data && <div className="pagination"><button disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Anterior</button><span>Página {page} de {Math.max(data.totalPages, 1)}</span><button disabled={page >= data.totalPages} onClick={() => setPage((value) => value + 1)}>Próxima</button></div>}
     </article>
-    {creating && <OpportunityDialog accounts={accounts} users={users} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); reload() }} />}
-    {selected && <OpportunityDetails deal={selected} onClose={() => setSelected(null)} onChanged={() => { setSelected(null); reload() }} />}
+    {creating && <OpportunityDialog accounts={accounts} users={users} attendances={attendances} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); reload() }} />}
+    {selected && <OpportunityDetails deal={selected} attendance={latestAttendance(selected, attendances)} onOpenAttendance={() => { setSelected(null); onNavigate('atendimentos') }} onClose={() => setSelected(null)} onChanged={() => { setSelected(null); reload() }} />}
   </section>
 }
 
-function OpportunityDialog({ accounts, users, onClose, onCreated }: { accounts: Account[]; users: User[]; onClose: () => void; onCreated: () => void }) {
+function OpportunityDialog({ accounts, users, attendances, onClose, onCreated }: { accounts: Account[]; users: User[]; attendances: Attendance[]; onClose: () => void; onCreated: () => void }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [selectedAccountId, setSelectedAccountId] = useState('')
+  const eligibleAttendances = attendances.filter((attendance) => attendance.cliente?.id === selectedAccountId && String(attendance.status ?? 'aberto').toLowerCase() !== 'cancelado')
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setSaving(true)
@@ -152,6 +178,7 @@ function OpportunityDialog({ accounts, users, onClose, onCreated }: { accounts: 
         body: {
           title: String(values.get('title') ?? ''),
           accountId: String(values.get('accountId') ?? '') || undefined,
+          atendimentoId: String(values.get('attendanceId') ?? ''),
           ownerId: String(values.get('ownerId') ?? '') || undefined,
           description: String(values.get('description') ?? '') || undefined,
           status: 'OPEN',
@@ -172,7 +199,8 @@ function OpportunityDialog({ accounts, users, onClose, onCreated }: { accounts: 
   }
   return <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="dialog opportunity-dialog" onSubmit={submit}><div className="panel-heading"><div><h2>Nova oportunidade</h2><p>Estruture a negociação e defina o próximo movimento.</p></div><button type="button" className="icon-button" onClick={onClose}><X /></button></div><div className="dialog-fields">
     <label className="full-field">Título da negociação<input name="title" required autoFocus placeholder="Ex.: Apartamento Florais para família Silva" /></label>
-    <label>Cliente<select name="accountId" required defaultValue=""><option value="">Selecione…</option>{accounts.map((account) => <option value={account.id} key={account.id}>{account.nome ?? account.name}</option>)}</select></label>
+    <label>Cliente<select name="accountId" required value={selectedAccountId} onChange={(event) => setSelectedAccountId(event.target.value)}><option value="">Selecione…</option>{accounts.map((account) => <option value={account.id} key={account.id}>{account.nome ?? account.name}</option>)}</select></label>
+    <label>Atendimento de origem<select name="attendanceId" required defaultValue="" key={selectedAccountId} disabled={!selectedAccountId}><option value="">{selectedAccountId && !eligibleAttendances.length ? 'Nenhum atendimento elegível' : 'Selecione o atendimento…'}</option>{eligibleAttendances.map((attendance) => <option value={attendance.id} key={attendance.id}>{attendanceStatus(attendance)} · {attendance.tipoAtendimento?.nome ?? 'Atendimento'} · {shortDate(attendance.createdAt)}</option>)}</select></label>
     <label>Responsável<select name="ownerId" defaultValue=""><option value="">Responsável atual</option>{users.map((user) => <option value={user.id} key={user.id}>{user.nome ?? user.name ?? user.email}</option>)}</select></label>
     <label>Valor estimado (R$)<input name="value" type="number" min="0" step=".01" required /></label>
     <label>Probabilidade<input name="probability" type="number" min="0" max="100" defaultValue="20" /></label>
@@ -184,7 +212,7 @@ function OpportunityDialog({ accounts, users, onClose, onCreated }: { accounts: 
   </div>{error && <div className="form-error">{error}</div>}<div className="dialog-actions"><button type="button" className="outline-button" onClick={onClose}>Cancelar</button><button className="gold-button" disabled={saving}>{saving ? 'Criando…' : 'Criar oportunidade'}</button></div></form></div>
 }
 
-function OpportunityDetails({ deal, onClose, onChanged }: { deal: Deal; onClose: () => void; onChanged: () => void }) {
+function OpportunityDetails({ deal, attendance, onOpenAttendance, onClose, onChanged }: { deal: Deal; attendance?: Attendance; onOpenAttendance: () => void; onClose: () => void; onChanged: () => void }) {
   const [working, setWorking] = useState(false)
   const [error, setError] = useState('')
   const [plan, setPlan] = useState({
@@ -251,6 +279,7 @@ function OpportunityDetails({ deal, onClose, onChanged }: { deal: Deal; onClose:
     }
   }
   return <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><div className="dialog opportunity-details"><div className="panel-heading"><div><span className={`status-chip deal-${deal.status ?? 'aberta'}`}>{statusLabel(deal.status)}</span><h2>{deal.titulo ?? 'Oportunidade'}</h2><p>{accountName(deal)}</p></div><button type="button" className="icon-button" onClick={onClose}><X /></button></div>
+    <section className={`opportunity-attendance-flow ${attendance ? '' : 'missing'}`}><ClipboardList /><div><span>Situação do atendimento</span><strong>{attendanceStatus(attendance)}</strong><small>{attendance ? [attendance.tipoAtendimento?.nome, attendance.empreendimento?.nome, shortDate(attendance.createdAt)].filter(Boolean).join(' · ') : 'Esta oportunidade precisa ser vinculada a um atendimento para manter o histórico comercial.'}</small></div><button type="button" className="outline-button" onClick={onOpenAttendance}>{attendance ? 'Abrir atendimentos' : 'Criar atendimento'}</button></section>
     <section className="opportunity-detail-value"><CircleDollarSign /><div><span>Valor estimado</span><strong>{brl(deal.valor)}</strong></div><div><span>Receita ponderada</span><strong>{brl(Number(deal.valor ?? 0) * Number(deal.probabilidade ?? 0) / 100)}</strong></div></section>
     <dl className="opportunity-detail-grid"><div><dt><Target /> Etapa</dt><dd>{deal.pipelineStage?.nome ?? 'Não classificada'}</dd></div><div><dt><TrendingUp /> Probabilidade</dt><dd>{deal.probabilidade ?? 0}%</dd></div><div><dt><Flame /> Temperatura</dt><dd>{deal.temperatura ?? 'Não definida'}</dd></div><div><dt><CalendarClock /> Fechamento previsto</dt><dd>{shortDate(deal.dataFechamentoEsperada)}</dd></div><div><dt><ArrowRight /> Próxima ação</dt><dd>{deal.proximaAcao ?? 'Não definida'}</dd></div><div><dt><UserRound /> Responsável</dt><dd>{deal.responsavel?.nome ?? deal.responsavel?.name ?? 'Não informado'}</dd></div></dl>
     <div className="opportunity-plan-editor"><label>Probabilidade<input type="number" min="0" max="100" value={plan.probability} onChange={(event) => setPlan((current) => ({ ...current, probability: event.target.value }))} /></label><label>Temperatura<select value={plan.temperature} onChange={(event) => setPlan((current) => ({ ...current, temperature: event.target.value }))}><option value="">Não definida</option><option value="fria">Fria</option><option value="morna">Morna</option><option value="quente">Quente</option></select></label><label>Fechamento<input type="date" value={plan.expectedCloseAt} onChange={(event) => setPlan((current) => ({ ...current, expectedCloseAt: event.target.value }))} /></label><label className="full-field">Próxima ação<input value={plan.nextAction} onChange={(event) => setPlan((current) => ({ ...current, nextAction: event.target.value }))} /></label><label>Quando<input type="datetime-local" value={plan.nextActionAt} onChange={(event) => setPlan((current) => ({ ...current, nextActionAt: event.target.value }))} /></label><button type="button" className="outline-button" disabled={working} onClick={() => void savePlan()}>Salvar plano</button></div>
