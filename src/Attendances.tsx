@@ -21,17 +21,6 @@ type Catalogs = {
   papeisComerciais: CatalogItem[]
 }
 type Development = { id: string; nome: string; tipo?: string; cidade?: string }
-type Property = {
-  id: string
-  empreendimentoId?: string
-  codigo?: string
-  titulo?: string
-  unidade?: string
-  torre?: string
-  status?: string
-  valor?: number | string
-}
-type PropertyPage = { items: Property[]; page: number; total: number; totalPages: number }
 type User = { id: string; nome?: string; name?: string; email?: string; ativo?: boolean }
 type RelatedItem = { id: string; nome: string; telefone?: string }
 type Money = { amount: string; currency: 'BRL' }
@@ -40,7 +29,6 @@ type Attendance = Record<string, unknown> & {
   status?: string
   cliente?: RelatedItem
   empreendimento?: RelatedItem
-  imovel?: RelatedItem & { codigo?: string }
   responsavel?: RelatedItem
   tipoAtendimento?: RelatedItem
   valorNegociacao?: Money
@@ -89,7 +77,6 @@ export default function AttendancesPage({ session, refreshKey }: { session: Publ
   const [items, setItems] = useState<Attendance[]>([])
   const [catalogs, setCatalogs] = useState<Catalogs>(emptyCatalogs)
   const [developments, setDevelopments] = useState<Development[]>([])
-  const [properties, setProperties] = useState<Property[]>([])
   const sessionUser = useMemo<User>(() => ({
     id: session.user.id,
     nome: session.user.name,
@@ -111,9 +98,8 @@ export default function AttendancesPage({ session, refreshKey }: { session: Publ
       apiRequest<AttendanceList | Attendance[]>({ method: 'GET', path: '/crm/atendimentos?limit=100' }),
       apiRequest<Catalogs>({ method: 'GET', path: '/crm/catalogos' }),
       apiRequest<Development[]>({ method: 'GET', path: '/imobiliario/empreendimentos' }),
-      apiRequest<PropertyPage>({ method: 'GET', path: '/imobiliario/imoveis?page=1&limit=100&status=disponivel' }),
       apiRequest<User[]>({ method: 'GET', path: '/organizacao/usuarios' }),
-    ]).then(([attendanceResult, catalogResult, developmentResult, propertyResult, userResult]) => {
+    ]).then(([attendanceResult, catalogResult, developmentResult, userResult]) => {
       if (!current) return
       if (attendanceResult.status === 'fulfilled') {
         const payload = attendanceResult.value.data
@@ -123,7 +109,6 @@ export default function AttendancesPage({ session, refreshKey }: { session: Publ
       }
       if (catalogResult.status === 'fulfilled') setCatalogs(catalogResult.value.data)
       if (developmentResult.status === 'fulfilled') setDevelopments(developmentResult.value.data)
-      if (propertyResult.status === 'fulfilled') setProperties(propertyResult.value.data.items)
       if (userResult.status === 'fulfilled') {
         const result = userResult.value.data
         setUsers(result.some((user) => user.id === session.user.id) ? result : [sessionUser, ...result])
@@ -146,13 +131,13 @@ export default function AttendancesPage({ session, refreshKey }: { session: Publ
       setError(apiErrorMessage(reason, 'Não foi possível abrir o atendimento'))
     }
   }
-  if (mode === 'form') return <AttendanceForm session={session} catalogs={catalogs} developments={developments} properties={properties} users={users} onCancel={() => setMode('list')} onCreated={() => { setMode('list'); setVersion((value) => value + 1) }} />
+  if (mode === 'form') return <AttendanceForm session={session} catalogs={catalogs} developments={developments} users={users} onCancel={() => setMode('list')} onCreated={() => { setMode('list'); setVersion((value) => value + 1) }} />
   return <section className="attendance-page"><div className="page-heading"><div><h1>Atendimentos</h1><p>{items.length} registros comerciais encontrados.</p></div><button className="gold-button attendance-create" onClick={() => setMode('form')}><Plus size={18} /> Novo atendimento</button></div>
     {selected && <AttendanceDetails attendance={selected} onClose={() => setSelected(null)} onChanged={() => { setSelected(null); setVersion((value) => value + 1) }} />}
     <article className="panel attendance-list-panel"><div className="attendance-list-toolbar"><label><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar no histórico…" /></label><button type="button" onClick={() => setVersion((value) => value + 1)}><RefreshCw size={16} /> Atualizar</button></div>
       {loading && <div className="state-panel"><RefreshCw className="spin" /><span>Consultando atendimentos…</span></div>}
       {error && <div className="state-panel error"><strong>Não foi possível carregar</strong><span>{error}</span><button onClick={() => setVersion((value) => value + 1)}>Tentar novamente</button></div>}
-      {!loading && !error && <div className="table-scroll"><table className="data-table attendance-table"><thead><tr><th>Data</th><th>Cliente</th><th>Empreendimento</th><th>Imóvel</th><th>Tipo</th><th>Responsável</th><th>Valor</th><th>Status</th></tr></thead><tbody>{filtered.map((item) => <tr key={item.id} onClick={() => void openAttendance(item)}><td>{item.createdAt ? new Date(item.createdAt).toLocaleDateString('pt-BR') : '—'}</td><td>{item.cliente?.nome ?? 'Não informado'}</td><td>{item.empreendimento?.nome ?? 'Não informado'}</td><td>{item.imovel ? [item.imovel.codigo, item.imovel.nome].filter(Boolean).join(' · ') : 'Não informado'}</td><td>{item.tipoAtendimento?.nome ?? 'Não informado'}</td><td>{item.responsavel?.nome ?? 'Não informado'}</td><td>{item.valorNegociacao === undefined ? '—' : money(item.valorNegociacao)}</td><td><span className="status-chip">{item.status ?? 'aberto'}</span></td></tr>)}</tbody></table>{!filtered.length && <div className="empty">Nenhum atendimento encontrado.</div>}</div>}
+      {!loading && !error && <div className="table-scroll"><table className="data-table attendance-table"><thead><tr><th>Data</th><th>Cliente</th><th>Empreendimento</th><th>Tipo</th><th>Responsável</th><th>Valor</th><th>Status</th></tr></thead><tbody>{filtered.map((item) => <tr key={item.id} onClick={() => void openAttendance(item)}><td>{item.createdAt ? new Date(item.createdAt).toLocaleDateString('pt-BR') : '—'}</td><td>{item.cliente?.nome ?? 'Não informado'}</td><td>{item.empreendimento?.nome ?? 'Não informado'}</td><td>{item.tipoAtendimento?.nome ?? 'Não informado'}</td><td>{item.responsavel?.nome ?? 'Não informado'}</td><td>{item.valorNegociacao === undefined ? '—' : money(item.valorNegociacao)}</td><td><span className="status-chip">{item.status ?? 'aberto'}</span></td></tr>)}</tbody></table>{!filtered.length && <div className="empty">Nenhum atendimento encontrado.</div>}</div>}
     </article>
   </section>
 }
@@ -171,23 +156,20 @@ function AttendanceDetails({ attendance, onClose, onChanged }: { attendance: Att
       setWorking(false)
     }
   }
-  return <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><div className="dialog attendance-details"><div className="panel-heading"><div><span className="status-chip">{attendance.status ?? 'aberto'}</span><h2>{attendance.cliente?.nome ?? 'Atendimento'}</h2><p>{attendance.tipoAtendimento?.nome ?? 'Atendimento comercial'}</p></div><button type="button" className="icon-button" onClick={onClose}>×</button></div><dl className="opportunity-detail-grid"><div><dt>Empreendimento</dt><dd>{attendance.empreendimento?.nome ?? 'Não informado'}</dd></div><div><dt>Imóvel / unidade</dt><dd>{attendance.imovel ? [attendance.imovel.codigo, attendance.imovel.nome].filter(Boolean).join(' · ') : 'Não informado'}</dd></div><div><dt>Responsável</dt><dd>{attendance.responsavel?.nome ?? 'Não informado'}</dd></div><div><dt>Valor potencial</dt><dd>{attendance.valorNegociacao === undefined ? 'Não informado' : money(attendance.valorNegociacao)}</dd></div><div><dt>Data</dt><dd>{attendance.createdAt ? new Date(attendance.createdAt).toLocaleString('pt-BR') : 'Não informada'}</dd></div></dl>{attendance.observacoes && <div className="review-notes"><strong>Observações</strong><p>{attendance.observacoes}</p></div>}{error && <div className="form-error">{error}</div>}<div className="dialog-actions">{attendance.status !== 'cancelado' && <button type="button" className="outline-button danger-action" disabled={working} onClick={() => void updateStatus('cancelado')}>Cancelar</button>}{attendance.status !== 'concluido' && <button type="button" className="outline-button success-action" disabled={working} onClick={() => void updateStatus('concluido')}>Concluir</button>}<button type="button" className="gold-button" disabled={working} onClick={onClose}>Fechar</button></div></div></div>
+  return <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><div className="dialog attendance-details"><div className="panel-heading"><div><span className="status-chip">{attendance.status ?? 'aberto'}</span><h2>{attendance.cliente?.nome ?? 'Atendimento'}</h2><p>{attendance.tipoAtendimento?.nome ?? 'Atendimento comercial'}</p></div><button type="button" className="icon-button" onClick={onClose}>×</button></div><dl className="opportunity-detail-grid"><div><dt>Empreendimento</dt><dd>{attendance.empreendimento?.nome ?? 'Não informado'}</dd></div><div><dt>Responsável</dt><dd>{attendance.responsavel?.nome ?? 'Não informado'}</dd></div><div><dt>Valor potencial</dt><dd>{attendance.valorNegociacao === undefined ? 'Não informado' : money(attendance.valorNegociacao)}</dd></div><div><dt>Data</dt><dd>{attendance.createdAt ? new Date(attendance.createdAt).toLocaleString('pt-BR') : 'Não informada'}</dd></div></dl>{attendance.observacoes && <div className="review-notes"><strong>Observações</strong><p>{attendance.observacoes}</p></div>}{error && <div className="form-error">{error}</div>}<div className="dialog-actions">{attendance.status !== 'cancelado' && <button type="button" className="outline-button danger-action" disabled={working} onClick={() => void updateStatus('cancelado')}>Cancelar</button>}{attendance.status !== 'concluido' && <button type="button" className="outline-button success-action" disabled={working} onClick={() => void updateStatus('concluido')}>Concluir</button>}<button type="button" className="gold-button" disabled={working} onClick={onClose}>Fechar</button></div></div></div>
 }
 
-function AttendanceForm({ session, catalogs, developments, properties: initialProperties, users, onCancel, onCreated }: {
+function AttendanceForm({ session, catalogs, developments, users, onCancel, onCreated }: {
   session: PublicSession
   catalogs: Catalogs
   developments: Development[]
-  properties: Property[]
   users: User[]
   onCancel: () => void
   onCreated: () => void
 }) {
   const [step, setStep] = useState(1)
-  const [properties, setProperties] = useState(initialProperties)
-  const [loadingProperties, setLoadingProperties] = useState(false)
   const [values, setValues] = useState<Record<string, string | boolean>>({
-    clientName: '', phone: '', email: '', periodId: '', typeId: '', developmentId: '', propertyId: '',
+    clientName: '', phone: '', email: '', periodId: '', typeId: '', developmentId: '',
     negotiationStatusId: '', originId: '', cicId: '', responsibleId: session.user.id,
     value: '', notes: '', schedule: false, start: '', end: '', location: '',
     googleSync: false,
@@ -197,42 +179,6 @@ function AttendanceForm({ session, catalogs, developments, properties: initialPr
   const [error, setError] = useState('')
   const set = (key: string, value: string | boolean) => setValues((current) => ({ ...current, [key]: value }))
   const selectedType = catalogs.tiposAtendimento.find((item) => item.id === values.typeId)
-  const selectedDevelopmentId = String(values.developmentId)
-  const availableProperties = properties.filter((property) =>
-    !selectedDevelopmentId || property.empreendimentoId === selectedDevelopmentId,
-  )
-  const propertyItems = availableProperties.map((property) => ({
-    id: property.id,
-    nome: [
-      property.codigo,
-      property.titulo,
-      property.unidade ? `Unidade ${property.unidade}` : '',
-      property.torre ? `Torre ${property.torre}` : '',
-    ].filter(Boolean).join(' · ') || 'Imóvel sem identificação',
-  }))
-
-  useEffect(() => {
-    if (!selectedDevelopmentId) {
-      setProperties(initialProperties)
-      setLoadingProperties(false)
-      return
-    }
-    let current = true
-    setLoadingProperties(true)
-    apiRequest<PropertyPage>({
-      method: 'GET',
-      path: `/imobiliario/imoveis?page=1&limit=100&status=disponivel&empreendimentoId=${encodeURIComponent(selectedDevelopmentId)}`,
-    }).then((result) => {
-      if (current) setProperties(result.data.items)
-    }).catch((reason) => {
-      if (current) setError(apiErrorMessage(reason, 'Não foi possível consultar os imóveis do empreendimento'))
-    }).finally(() => {
-      if (current) setLoadingProperties(false)
-    })
-    return () => {
-      current = false
-    }
-  }, [initialProperties, selectedDevelopmentId])
   const canAdvance = step === 1
     ? Boolean(values.clientName && String(values.phone).replace(/\D/g, '').length >= 8)
     : Boolean(values.typeId && values.responsibleId && (!values.schedule || (values.start && values.end)))
@@ -249,7 +195,6 @@ function AttendanceForm({ session, catalogs, developments, properties: initialPr
       periodoId: values.periodId || undefined,
       tipoAtendimentoId: values.typeId || undefined,
       empreendimentoId: values.developmentId || undefined,
-      imovelId: values.propertyId || undefined,
       statusNegociacaoId: values.negotiationStatusId || undefined,
       origemId: values.originId || undefined,
       cicId: values.cicId || undefined,
@@ -288,17 +233,7 @@ function AttendanceForm({ session, catalogs, developments, properties: initialPr
       {step === 2 && <div className="attendance-form-section"><header><h2>Formulário de Atendimento</h2><p>Classifique o atendimento utilizando os catálogos da empresa.</p></header><div className="attendance-fields">
         <SelectField label="Período" value={String(values.periodId)} items={catalogs.periodos} onChange={(value) => set('periodId', value)} />
         <SelectField label="Tipo de atendimento *" value={String(values.typeId)} items={catalogs.tiposAtendimento} onChange={(value) => set('typeId', value)} required />
-        <SelectField label="Empreendimento" value={String(values.developmentId)} items={developments} onChange={(value) => setValues((current) => ({ ...current, developmentId: value, propertyId: '' }))} />
-        <SelectField label="Imóvel / unidade" value={String(values.propertyId)} items={propertyItems} onChange={(value) => {
-          const property = properties.find((item) => item.id === value)
-          setValues((current) => ({
-            ...current,
-            propertyId: value,
-            developmentId: String(current.developmentId || property?.empreendimentoId || ''),
-          }))
-        }} />
-        {loadingProperties && <div className="catalog-warning full-field">Consultando imóveis disponíveis do empreendimento…</div>}
-        {selectedDevelopmentId && !loadingProperties && !availableProperties.length && <div className="catalog-warning full-field">Nenhum imóvel disponível está vinculado a este empreendimento. Cadastre ou vincule a unidade no módulo imobiliário antes de concluir o atendimento.</div>}
+        <SelectField label="Empreendimento" value={String(values.developmentId)} items={developments} onChange={(value) => set('developmentId', value)} />
         <SelectField label="Status da negociação" value={String(values.negotiationStatusId)} items={catalogs.statusNegociacao} onChange={(value) => set('negotiationStatusId', value)} />
         <SelectField label="Origem" value={String(values.originId)} items={catalogs.origens} onChange={(value) => set('originId', value)} />
         <SelectField label="CIC" value={String(values.cicId)} items={users.map((user) => ({ id: user.id, nome: user.nome ?? user.name ?? user.email ?? 'Usuário' }))} onChange={(value) => set('cicId', value)} />
@@ -310,7 +245,7 @@ function AttendanceForm({ session, catalogs, developments, properties: initialPr
         {values.schedule && <><label>Início<input type="datetime-local" value={String(values.start)} onChange={(event) => set('start', event.target.value)} required /></label><label>Fim<input type="datetime-local" value={String(values.end)} onChange={(event) => set('end', event.target.value)} required /></label><label>Local<input value={String(values.location)} onChange={(event) => set('location', event.target.value)} /></label><label className="attendance-check"><input type="checkbox" checked={Boolean(values.googleSync)} onChange={(event) => set('googleSync', event.target.checked)} /> Sincronizar com Google Calendar</label></>}
         {selectedType?.exigeFoto && <div className="catalog-warning full-field">Este tipo de atendimento exige foto conforme o catálogo da empresa.</div>}
       </div></div>}
-      {step === 3 && <AttendanceReview values={values} catalogs={catalogs} developments={developments} properties={properties} users={users} photo={photo} />}
+      {step === 3 && <AttendanceReview values={values} catalogs={catalogs} developments={developments} users={users} photo={photo} />}
       {error && <div className="form-error">{error}</div>}
       <footer className="attendance-form-actions">{step > 1 ? <button type="button" className="outline-button" onClick={() => setStep((current) => current - 1)}><ArrowLeft size={16} /> Voltar</button> : <button type="button" className="outline-button" onClick={onCancel}>Cancelar</button>}<button className="gold-button" disabled={saving || (step < 3 && !canAdvance)}>{saving ? 'Registrando…' : step < 3 ? <>Continuar <ArrowRight size={16} /></> : <>Confirmar atendimento <Check size={16} /></>}</button></footer>
     </form>
@@ -321,13 +256,12 @@ function SelectField({ label, value, items, onChange, required = false }: { labe
   return <label>{label}<select value={value} onChange={(event) => onChange(event.target.value)} required={required}><option value="">Selecione…</option>{items.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select></label>
 }
 
-function AttendanceReview({ values, catalogs, developments, properties, users, photo }: { values: Record<string, string | boolean>; catalogs: Catalogs; developments: Development[]; properties: Property[]; users: User[]; photo: File | null }) {
+function AttendanceReview({ values, catalogs, developments, users, photo }: { values: Record<string, string | boolean>; catalogs: Catalogs; developments: Development[]; users: User[]; photo: File | null }) {
   const find = (items: Array<{ id: string; nome?: string; name?: string; email?: string }>, id: unknown) => items.find((item) => item.id === id)?.nome ?? items.find((item) => item.id === id)?.name ?? items.find((item) => item.id === id)?.email ?? 'Não informado'
   const rows = [
     ['Cliente', values.clientName], ['Telefone', values.phone], ['E-mail', values.email || 'Não informado'],
     ['Período', find(catalogs.periodos, values.periodId)], ['Tipo', find(catalogs.tiposAtendimento, values.typeId)],
     ['Empreendimento', find(developments, values.developmentId)],
-    ['Imóvel / unidade', find(properties.map((property) => ({ id: property.id, nome: [property.codigo, property.titulo, property.unidade].filter(Boolean).join(' · ') })), values.propertyId)],
     ['Status', find(catalogs.statusNegociacao, values.negotiationStatusId)],
     ['Origem', find(catalogs.origens, values.originId)], ['CIC', find(users, values.cicId)],
     ['Responsável', find(users, values.responsibleId)], ['Valor', values.value ? money(values.value) : 'Não informado'],
