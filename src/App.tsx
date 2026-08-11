@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { CSSProperties, FormEvent } from 'react'
 import {
   BarChart3, Bell, CheckCircle2, ChevronLeft, CircleDollarSign, Clock3, GitBranch,
-  CalendarDays, ClipboardList, LayoutDashboard, MapPin, Megaphone, Menu, RefreshCw, Search, Settings, Target,
+  CalendarCheck2, CalendarDays, ClipboardList, FileSpreadsheet, FileText, LayoutDashboard, MapPin, Megaphone, Menu, RefreshCw, Search, Settings, Target,
   UsersRound, X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -38,6 +38,11 @@ type Central = {
 type Analytics = {
   crm: Row[]; imobiliario: Row[]; vendas: Row[]; tarefas: Row[]; generatedAt: string
 }
+type DashboardAttendance = Row & {
+  id: string; status?: string; createdAt?: string; updatedAt?: string
+  cliente?: { nome?: string }; tipoAtendimento?: { nome?: string }
+}
+type AttendancePayload = DashboardAttendance[] | { items: DashboardAttendance[]; total?: number }
 
 const sections: Section[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -147,7 +152,7 @@ function StatePanel({ loading, error, onRetry }: { loading: boolean; error: stri
   return null
 }
 
-function Dashboard({ refreshKey }: { refreshKey: number }) {
+export function LegacyDashboard({ refreshKey }: { refreshKey: number }) {
   const central = useRemote(async () => (await apiRequest<Central>({ method: 'GET', path: '/crm/central' })).data, [refreshKey])
   const analytics = useRemote(async () => (await apiRequest<Analytics>({ method: 'GET', path: '/analytics/dashboard' })).data, [refreshKey])
   if (!central.data) return <StatePanel loading={central.loading} error={central.error} onRetry={central.reload} />
@@ -175,6 +180,74 @@ function Dashboard({ refreshKey }: { refreshKey: number }) {
         <li><span>Tarefas vencidas</span><strong>{metrics.overdueActivities}</strong></li>
       </ul></article>
       <article className="panel sellers-panel wide-panel"><div className="panel-heading"><h2>Próximas atividades</h2><span>Agenda operacional</span></div><DataTable rows={central.data.nextActivities} kind="activities" compact /></article>
+    </section>
+  </>
+}
+
+function Dashboard({ refreshKey, onNavigate }: { refreshKey: number; onNavigate: (id: string) => void }) {
+  const central = useRemote(async () => (await apiRequest<Central>({ method: 'GET', path: '/crm/central' })).data, [refreshKey])
+  const operation = useRemote(async () => {
+    const now = new Date()
+    const start = new Date(now.getFullYear(), 0, 1).toISOString()
+    const end = new Date(now.getFullYear() + 1, 0, 1).toISOString()
+    const [attendanceResult, scheduleResult] = await Promise.all([
+      apiRequest<AttendancePayload>({ method: 'GET', path: '/crm/atendimentos?limit=100' }),
+      apiRequest<DayEvent[]>({ method: 'GET', path: `/calendar/events?${new URLSearchParams({ start, end })}` }),
+    ])
+    const payload = attendanceResult.data
+    return { attendances: Array.isArray(payload) ? payload : payload.items, schedules: scheduleResult.data }
+  }, [refreshKey])
+  const [period, setPeriod] = useState<'dia' | 'mes' | 'ano'>('mes')
+  if (!central.data) return <StatePanel loading={central.loading} error={central.error} onRetry={central.reload} />
+
+  const metrics = central.data.metrics
+  const attendances = operation.data?.attendances ?? []
+  const schedules = operation.data?.schedules ?? []
+  const now = new Date()
+  const normalizedStatus = (value?: string) => (value ?? 'aberto').toLocaleLowerCase('pt-BR')
+  const finishedStatuses = ['concluido', 'concluído', 'finalizado', 'realizado', 'ganho', 'convertido']
+  const lostStatuses = ['cancelado', 'perdido', 'nao_compareceu', 'não compareceu']
+  const completed = attendances.filter((item) => finishedStatuses.includes(normalizedStatus(item.status)))
+  const lost = attendances.filter((item) => lostStatuses.includes(normalizedStatus(item.status)))
+  const inProgress = Math.max(0, attendances.length - completed.length - lost.length)
+  const todaySchedules = schedules.filter((item) => new Date(item.inicio).toDateString() === now.toDateString() && item.status !== 'cancelado')
+  const conversion = attendances.length ? Math.round((completed.length / attendances.length) * 100) : 0
+  const cards = [
+    { label: 'Atendimentos', value: attendances.length, detail: `${inProgress} em andamento`, icon: ClipboardList },
+    { label: 'Agenda de hoje', value: todaySchedules.length, detail: `${todaySchedules.filter((item) => item.status === 'confirmado').length} confirmados`, icon: CalendarCheck2 },
+    { label: 'Entregas realizadas', value: completed.length, detail: `${conversion}% dos atendimentos`, icon: CheckCircle2 },
+    { label: 'Resultado gerado', value: money(metrics.pipelineValueCents), detail: `${metrics.wonDeals} negócios ganhos`, icon: CircleDollarSign },
+  ]
+  const anchors = period === 'dia'
+    ? Array.from({ length: 7 }, (_, index) => { const d = new Date(now); d.setDate(now.getDate() - (6 - index)); return d })
+    : period === 'mes'
+      ? Array.from({ length: 6 }, (_, index) => new Date(now.getFullYear(), now.getMonth() - (5 - index), 1))
+      : Array.from({ length: 5 }, (_, index) => new Date(now.getFullYear() - (4 - index), 0, 1))
+  const points = anchors.map((anchor) => {
+    const matches = (value?: string) => {
+      if (!value) return false
+      const d = new Date(value)
+      return period === 'dia' ? d.toDateString() === anchor.toDateString() : period === 'mes' ? d.getMonth() === anchor.getMonth() && d.getFullYear() === anchor.getFullYear() : d.getFullYear() === anchor.getFullYear()
+    }
+    return {
+      label: period === 'dia' ? anchor.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '') : period === 'mes' ? anchor.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '') : String(anchor.getFullYear()),
+      attendances: attendances.filter((item) => matches(item.createdAt)).length,
+      deliveries: completed.filter((item) => matches(item.updatedAt ?? item.createdAt)).length,
+    }
+  })
+  const chartMax = Math.max(1, ...points.flatMap((item) => [item.attendances, item.deliveries]))
+  const upcoming = schedules.filter((item) => new Date(item.fim).getTime() >= Date.now() && item.status !== 'cancelado').sort((a, b) => +new Date(a.inicio) - +new Date(b.inicio)).slice(0, 5)
+  const recent = attendances.slice().sort((a, b) => +new Date(b.createdAt ?? 0) - +new Date(a.createdAt ?? 0)).slice(0, 5)
+
+  return <>
+    <div className="page-heading"><div><h1>Central de resultados</h1><p>Atendimentos, agenda, entregas e resultados comerciais em uma só visão.</p></div><button className="period-button" onClick={() => { central.reload(); operation.reload() }}><RefreshCw size={15} /> Atualizar</button></div>
+    {operation.error && <div className="inline-warning">Alguns dados operacionais não puderam ser atualizados: {operation.error}</div>}
+    <section className="metrics-grid">{cards.map(({ label, value, detail, icon: Icon }) => <article className="metric-card" key={label}><div className="metric-icon"><Icon size={23} /></div><div><span>{label}</span><strong>{value}</strong><small>{detail}</small></div></article>)}</section>
+    <section className="dashboard-grid results-dashboard">
+      <article className="panel delivery-panel"><div className="panel-heading"><div><h2>Atendimentos × entregas</h2><span>Evolução dos resultados gerados</span></div><div className="chart-periods">{(['dia', 'mes', 'ano'] as const).map((item) => <button key={item} className={period === item ? 'active' : ''} onClick={() => setPeriod(item)}>{item === 'dia' ? '7 dias' : item === 'mes' ? '6 meses' : '5 anos'}</button>)}</div></div><div className="delivery-legend"><span><i className="attendance-dot" />Atendimentos</span><span><i className="delivery-dot" />Entregas</span></div><div className="delivery-chart">{points.map((item) => <div className="delivery-column" key={item.label}><div className="delivery-bars"><span title={`${item.attendances} atendimentos`} style={{ height: `${Math.max(item.attendances ? 8 : 0, item.attendances / chartMax * 100)}%` }}><b>{item.attendances || ''}</b></span><span title={`${item.deliveries} entregas`} style={{ height: `${Math.max(item.deliveries ? 8 : 0, item.deliveries / chartMax * 100)}%` }}><b>{item.deliveries || ''}</b></span></div><small>{item.label}</small></div>)}</div></article>
+      <article className="panel outcome-panel"><div className="panel-heading"><h2>Resultado dos atendimentos</h2><button onClick={() => onNavigate('atendimentos')}>Ver todos</button></div><div className="outcome-ring" style={{ '--completed': `${conversion * 3.6}deg` } as CSSProperties}><strong>{conversion}%</strong><span>convertidos</span></div><ul className="summary-list"><li><span><i className="success-dot" />Concluídos</span><strong>{completed.length}</strong></li><li><span><i className="progress-dot" />Em andamento</span><strong>{inProgress}</strong></li><li><span><i className="lost-dot" />Cancelados / perdidos</span><strong>{lost.length}</strong></li></ul></article>
+      <article className="panel agenda-panel"><div className="panel-heading"><div><h2>Próximos agendamentos</h2><span>Compromissos ligados à operação</span></div><button onClick={() => onNavigate('agenda')}>Abrir agenda</button></div><div className="dashboard-agenda-list">{upcoming.length ? upcoming.map((item) => <button key={item.id} onClick={() => onNavigate('agenda')}><time><strong>{new Date(item.inicio).toLocaleDateString('pt-BR', { day: '2-digit' })}</strong><span>{new Date(item.inicio).toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')}</span></time><div><strong>{item.titulo}</strong><span>{new Date(item.inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}{item.local ? ` · ${item.local}` : ''}</span></div><span className="status-chip">{item.status ?? 'agendado'}</span></button>) : <div className="empty">Nenhum agendamento futuro.</div>}</div></article>
+      <article className="panel recent-attendance-panel"><div className="panel-heading"><div><h2>Atendimentos recentes</h2><span>Origem dos resultados comerciais</span></div><button onClick={() => onNavigate('atendimentos')}>Ver atendimentos</button></div><div className="recent-attendance-list">{recent.length ? recent.map((item) => <button key={item.id} onClick={() => onNavigate('atendimentos')}><div><strong>{item.cliente?.nome ?? 'Cliente não informado'}</strong><span>{item.tipoAtendimento?.nome ?? 'Atendimento'} · {item.createdAt ? new Date(item.createdAt).toLocaleDateString('pt-BR') : 'sem data'}</span></div><span className="status-chip">{item.status ?? 'aberto'}</span></button>) : <div className="empty">Nenhum atendimento encontrado.</div>}</div></article>
     </section>
   </>
 }
@@ -226,7 +299,7 @@ function CreateDialog({ kind, onClose, onCreated }: { kind: string; onClose: () 
   return <div className="dialog-backdrop" role="presentation" onMouseDown={(e) => e.target === e.currentTarget && onClose()}><form className="dialog" onSubmit={submit}><div className="panel-heading"><h2>Novo registro</h2><button type="button" className="icon-button" onClick={onClose}><X /></button></div><label>Nome / título<input name="name" required autoFocus /></label>{kind === 'leads' && <><label>E-mail<input name="email" type="email" /></label><label>Telefone<input name="phone" /></label></>}{kind === 'oportunidades' && <label>Valor (R$)<input name="value" type="number" min="0" step=".01" /></label>}{kind === 'fluxo' && <label>Prazo<input name="dueAt" type="datetime-local" /></label>}{error && <div className="form-error">{error}</div>}<button className="gold-button" disabled={saving}>{saving ? 'Salvando…' : 'Salvar na API'}</button></form></div>
 }
 
-function Reports({ refreshKey }: { refreshKey: number }) {
+export function LegacyReports({ refreshKey }: { refreshKey: number }) {
   const remote = useRemote(async () => (await apiRequest<Analytics>({ method: 'GET', path: '/analytics/dashboard' })).data, [refreshKey])
   if (!remote.data) return <StatePanel loading={remote.loading} error={remote.error} onRetry={remote.reload} />
   const blocks = [
@@ -234,6 +307,171 @@ function Reports({ refreshKey }: { refreshKey: number }) {
     ['Vendas', remote.data.vendas[0] ?? {}], ['Tarefas', remote.data.tarefas[0] ?? {}],
   ] as const
   return <><div className="page-heading"><div><h1>Relatórios</h1><p>Indicadores consolidados em {new Date(remote.data.generatedAt).toLocaleString('pt-BR')}.</p></div><button className="period-button" onClick={remote.reload}><RefreshCw size={15} /> Atualizar</button></div><section className="report-grid">{blocks.map(([title, values]) => <article className="panel" key={title}><h2>{title}</h2><dl>{Object.entries(values).filter(([key]) => key !== 'empresaId').map(([key, value]) => <div key={key}><dt>{key.replace(/([A-Z])/g, ' $1')}</dt><dd>{String(value ?? 0)}</dd></div>)}</dl></article>)}</section></>
+}
+
+export function AnalyticsReports({ refreshKey }: { refreshKey: number }) {
+  const remote = useRemote(async () => (await apiRequest<Analytics>({ method: 'GET', path: '/analytics/dashboard' })).data, [refreshKey])
+  const [exporting, setExporting] = useState<'excel' | 'pdf' | null>(null)
+  const [exportError, setExportError] = useState('')
+  if (!remote.data) return <StatePanel loading={remote.loading} error={remote.error} onRetry={remote.reload} />
+  const report = remote.data
+  const blocks = [
+    ['CRM', report.crm[0] ?? {}], ['Imobiliário', report.imobiliario[0] ?? {}],
+    ['Vendas', report.vendas[0] ?? {}], ['Tarefas', report.tarefas[0] ?? {}],
+  ] as const
+  const cleanEntries = (values: Row) => Object.entries(values).filter(([key]) => key !== 'empresaId')
+  const label = (key: string) => key.replace(/([A-Z])/g, ' $1').replace(/^./, (letter) => letter.toUpperCase())
+  const printable = (value: unknown) => typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value ?? 0)
+  const stamp = new Date().toISOString().slice(0, 10)
+
+  const exportExcel = async () => {
+    setExporting('excel'); setExportError('')
+    try {
+      const XLSX = await import('xlsx')
+      const workbook = XLSX.utils.book_new()
+      blocks.forEach(([title, values]) => {
+        const rows = cleanEntries(values).map(([key, value]) => ({ Indicador: label(key), Resultado: printable(value) }))
+        const sheet = XLSX.utils.json_to_sheet(rows)
+        sheet['!cols'] = [{ wch: 32 }, { wch: 24 }]
+        XLSX.utils.book_append_sheet(workbook, sheet, title.slice(0, 31))
+      })
+      XLSX.writeFile(workbook, `relatorio-reis-${stamp}.xlsx`, { compression: true })
+    } catch (reason) { setExportError(reason instanceof Error ? reason.message : 'Não foi possível gerar o Excel.') }
+    finally { setExporting(null) }
+  }
+  const exportPdf = async () => {
+    setExporting('pdf'); setExportError('')
+    try {
+      const { jsPDF } = await import('jspdf')
+      const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+      const pageWidth = doc.internal.pageSize.getWidth()
+      let y = 22
+      const ensureSpace = (height: number) => { if (y + height > 282) { doc.addPage(); y = 20 } }
+      doc.setFillColor(20, 20, 20); doc.rect(0, 0, pageWidth, 38, 'F')
+      doc.setTextColor(218, 176, 37); doc.setFontSize(20); doc.text('REIS | Relatório de resultados', 16, 20)
+      doc.setTextColor(210, 210, 210); doc.setFontSize(9); doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')}`, 16, 29)
+      y = 50
+      blocks.forEach(([title, values]) => {
+        ensureSpace(20)
+        doc.setTextColor(20, 20, 20); doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.text(title, 16, y); y += 8
+        cleanEntries(values).forEach(([key, value], index) => {
+          ensureSpace(10)
+          if (index % 2 === 0) { doc.setFillColor(246, 243, 234); doc.rect(14, y - 5.5, pageWidth - 28, 8, 'F') }
+          doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(80, 80, 80); doc.text(label(key), 17, y)
+          doc.setFont('helvetica', 'bold'); doc.setTextColor(25, 25, 25); doc.text(printable(value).slice(0, 55), pageWidth - 17, y, { align: 'right' }); y += 8
+        })
+        y += 8
+      })
+      const pages = doc.getNumberOfPages()
+      for (let page = 1; page <= pages; page += 1) { doc.setPage(page); doc.setFontSize(8); doc.setTextColor(130); doc.text(`Página ${page} de ${pages}`, pageWidth - 16, 291, { align: 'right' }) }
+      doc.save(`relatorio-reis-${stamp}.pdf`)
+    } catch (reason) { setExportError(reason instanceof Error ? reason.message : 'Não foi possível gerar o PDF.') }
+    finally { setExporting(null) }
+  }
+  return <>
+    <div className="page-heading report-heading"><div><h1>Relatórios</h1><p>Indicadores consolidados em {new Date(report.generatedAt).toLocaleString('pt-BR')}.</p></div><div className="report-actions"><button className="outline-button excel-button" disabled={Boolean(exporting)} onClick={() => void exportExcel()}><FileSpreadsheet size={17} />{exporting === 'excel' ? 'Gerando Excel…' : 'Exportar Excel'}</button><button className="gold-button" disabled={Boolean(exporting)} onClick={() => void exportPdf()}><FileText size={17} />{exporting === 'pdf' ? 'Gerando PDF…' : 'Exportar PDF'}</button><button className="period-button" onClick={remote.reload}><RefreshCw size={15} /> Atualizar</button></div></div>
+    {exportError && <div className="inline-warning">{exportError}</div>}
+    <section className="report-grid">{blocks.map(([title, values]) => <article className="panel" key={title}><h2>{title}</h2><dl>{cleanEntries(values).map(([key, value]) => <div key={key}><dt>{label(key)}</dt><dd>{printable(value)}</dd></div>)}</dl></article>)}</section>
+  </>
+}
+
+function Reports({ refreshKey }: { refreshKey: number }) {
+  const remote = useRemote(async () => {
+    const now = new Date()
+    const start = new Date(now.getFullYear(), 0, 1).toISOString()
+    const end = new Date(now.getFullYear() + 1, 0, 1).toISOString()
+    const [attendanceResult, scheduleResult, centralResult] = await Promise.all([
+      apiRequest<AttendancePayload>({ method: 'GET', path: '/crm/atendimentos?limit=100' }),
+      apiRequest<DayEvent[]>({ method: 'GET', path: `/calendar/events?${new URLSearchParams({ start, end })}` }),
+      apiRequest<Central>({ method: 'GET', path: '/crm/central' }),
+    ])
+    const payload = attendanceResult.data
+    return { attendances: Array.isArray(payload) ? payload : payload.items, schedules: scheduleResult.data, central: centralResult.data }
+  }, [refreshKey])
+  const [exporting, setExporting] = useState<'excel' | 'pdf' | null>(null)
+  const [exportError, setExportError] = useState('')
+  if (!remote.data) return <StatePanel loading={remote.loading} error={remote.error} onRetry={remote.reload} />
+
+  const { attendances, schedules, central } = remote.data
+  const field = (item: DashboardAttendance, ...keys: string[]) => keys.map((key) => item[key]).find((value) => value !== undefined && value !== null)
+  const relatedName = (item: DashboardAttendance, key: string) => {
+    const value = item[key]
+    return value && typeof value === 'object' && 'nome' in value ? String((value as { nome?: unknown }).nome ?? '—') : '—'
+  }
+  const amount = (item: DashboardAttendance) => {
+    const value = field(item, 'valorNegociacao', 'valor', 'value')
+    if (value && typeof value === 'object' && 'amount' in value) return Number((value as { amount: unknown }).amount) || 0
+    return Number(value ?? 0) || 0
+  }
+  const normalize = (value?: string) => (value ?? 'aberto').toLocaleLowerCase('pt-BR')
+  const finishedStatuses = ['concluido', 'concluído', 'finalizado', 'realizado', 'ganho', 'convertido']
+  const lostStatuses = ['cancelado', 'perdido', 'nao_compareceu', 'não compareceu']
+  const completed = attendances.filter((item) => finishedStatuses.includes(normalize(item.status)))
+  const lost = attendances.filter((item) => lostStatuses.includes(normalize(item.status)))
+  const open = Math.max(0, attendances.length - completed.length - lost.length)
+  const totalValue = attendances.reduce((sum, item) => sum + amount(item), 0)
+  const conversion = attendances.length ? Math.round(completed.length / attendances.length * 100) : 0
+  const statusCounts = Object.entries(attendances.reduce<Record<string, number>>((acc, item) => { const key = item.status ?? 'Aberto'; acc[key] = (acc[key] ?? 0) + 1; return acc }, {})).sort((a, b) => b[1] - a[1])
+  const monthRows = Array.from({ length: 12 }, (_, month) => {
+    const items = attendances.filter((item) => item.createdAt && new Date(item.createdAt).getFullYear() === new Date().getFullYear() && new Date(item.createdAt).getMonth() === month)
+    return { month: new Date(new Date().getFullYear(), month, 1).toLocaleDateString('pt-BR', { month: 'long' }), count: items.length, completed: items.filter((item) => finishedStatuses.includes(normalize(item.status))).length, value: items.reduce((sum, item) => sum + amount(item), 0) }
+  })
+  const rows = attendances.slice().sort((a, b) => +new Date(b.createdAt ?? 0) - +new Date(a.createdAt ?? 0)).map((item) => ({
+    Data: item.createdAt ? new Date(item.createdAt).toLocaleDateString('pt-BR') : '—',
+    Cliente: item.cliente?.nome ?? relatedName(item, 'cliente'),
+    Tipo: item.tipoAtendimento?.nome ?? relatedName(item, 'tipoAtendimento'),
+    Responsável: relatedName(item, 'responsavel'),
+    Empreendimento: relatedName(item, 'empreendimento'),
+    Origem: relatedName(item, 'origem'),
+    Status: item.status ?? 'aberto',
+    Valor: amount(item),
+    Observações: String(field(item, 'observacoes', 'descricao', 'notes') ?? ''),
+  }))
+  const moneyValue = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
+  const stamp = new Date().toISOString().slice(0, 10)
+  const exportExcel = async () => {
+    setExporting('excel'); setExportError('')
+    try {
+      const XLSX = await import('xlsx')
+      const book = XLSX.utils.book_new()
+      const summary = [
+        { Indicador: 'Total de atendimentos', Resultado: attendances.length }, { Indicador: 'Concluídos', Resultado: completed.length },
+        { Indicador: 'Em andamento', Resultado: open }, { Indicador: 'Cancelados / perdidos', Resultado: lost.length },
+        { Indicador: 'Taxa de conversão', Resultado: `${conversion}%` }, { Indicador: 'Valor negociado', Resultado: totalValue },
+        { Indicador: 'Agendamentos no ano', Resultado: schedules.length }, { Indicador: 'Negócios ganhos', Resultado: central.metrics.wonDeals },
+      ]
+      const summarySheet = XLSX.utils.json_to_sheet(summary); summarySheet['!cols'] = [{ wch: 30 }, { wch: 22 }]
+      const detailSheet = XLSX.utils.json_to_sheet(rows); detailSheet['!cols'] = [12, 28, 24, 24, 28, 20, 18, 16, 48].map((wch) => ({ wch }))
+      const monthSheet = XLSX.utils.json_to_sheet(monthRows.map((item) => ({ Mês: item.month, Atendimentos: item.count, Concluídos: item.completed, 'Valor negociado': item.value })))
+      const statusSheet = XLSX.utils.json_to_sheet(statusCounts.map(([status, count]) => ({ Status: status, Atendimentos: count, Participação: `${attendances.length ? Math.round(count / attendances.length * 100) : 0}%` })))
+      XLSX.utils.book_append_sheet(book, summarySheet, 'Resumo executivo'); XLSX.utils.book_append_sheet(book, detailSheet, 'Atendimentos'); XLSX.utils.book_append_sheet(book, monthSheet, 'Evolução mensal'); XLSX.utils.book_append_sheet(book, statusSheet, 'Status')
+      XLSX.writeFile(book, `relatorio-atendimentos-reis-${stamp}.xlsx`, { compression: true })
+    } catch (reason) { setExportError(reason instanceof Error ? reason.message : 'Não foi possível gerar o Excel.') } finally { setExporting(null) }
+  }
+  const exportPdf = async () => {
+    setExporting('pdf'); setExportError('')
+    try {
+      const { jsPDF } = await import('jspdf'); const doc = new jsPDF({ unit: 'mm', format: 'a4' }); const width = doc.internal.pageSize.getWidth(); let y = 18
+      const page = () => { doc.addPage(); y = 18 }
+      const space = (height: number) => { if (y + height > 282) page() }
+      doc.setFillColor(17, 17, 17); doc.rect(0, 0, width, 42, 'F'); doc.setTextColor(226, 188, 67); doc.setFont('helvetica', 'bold'); doc.setFontSize(19); doc.text('REIS | Relatório de Atendimentos', 15, 19); doc.setFontSize(9); doc.setTextColor(210); doc.setFont('helvetica', 'normal'); doc.text(`Análise profissional gerada em ${new Date().toLocaleString('pt-BR')}`, 15, 29); y = 53
+      doc.setTextColor(20); doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.text('Resumo executivo', 15, y); y += 9
+      const metrics = [['Atendimentos', attendances.length], ['Concluídos', completed.length], ['Em andamento', open], ['Conversão', `${conversion}%`], ['Valor negociado', moneyValue(totalValue)], ['Agendamentos', schedules.length]] as const
+      metrics.forEach(([name, value], index) => { const x = 15 + (index % 2) * 91; if (index > 0 && index % 2 === 0) y += 20; doc.setFillColor(247, 244, 235); doc.roundedRect(x, y, 84, 15, 2, 2, 'F'); doc.setFontSize(8); doc.setTextColor(90); doc.setFont('helvetica', 'normal'); doc.text(String(name), x + 4, y + 5); doc.setFontSize(11); doc.setTextColor(20); doc.setFont('helvetica', 'bold'); doc.text(String(value), x + 4, y + 11) }); y += 28
+      doc.setFontSize(14); doc.text('Distribuição por status', 15, y); y += 8
+      statusCounts.forEach(([status, count]) => { space(8); doc.setFillColor(245, 242, 232); doc.rect(15, y - 5, 180, 7, 'F'); doc.setFontSize(9); doc.setTextColor(55); doc.setFont('helvetica', 'normal'); doc.text(status, 18, y); doc.setFont('helvetica', 'bold'); doc.text(`${count} (${attendances.length ? Math.round(count / attendances.length * 100) : 0}%)`, 191, y, { align: 'right' }); y += 8 }); y += 5
+      space(18); doc.setFontSize(14); doc.setTextColor(20); doc.text('Detalhamento dos atendimentos', 15, y); y += 8
+      rows.forEach((row, index) => { space(26); doc.setDrawColor(225); doc.line(15, y - 3, 195, y - 3); doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(25); doc.text(`${index + 1}. ${row.Cliente}`.slice(0, 80), 15, y + 3); doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(80); doc.text(`${row.Data} | ${row.Tipo} | ${row.Status}`.slice(0, 105), 15, y + 9); doc.text(`Responsável: ${row.Responsável} | Empreendimento: ${row.Empreendimento}`.slice(0, 105), 15, y + 15); doc.setFont('helvetica', 'bold'); doc.text(moneyValue(row.Valor), 195, y + 3, { align: 'right' }); y += 24 })
+      const pages = doc.getNumberOfPages(); for (let index = 1; index <= pages; index += 1) { doc.setPage(index); doc.setFontSize(8); doc.setTextColor(130); doc.text(`Página ${index} de ${pages}`, 194, 291, { align: 'right' }) }
+      doc.save(`relatorio-atendimentos-reis-${stamp}.pdf`)
+    } catch (reason) { setExportError(reason instanceof Error ? reason.message : 'Não foi possível gerar o PDF.') } finally { setExporting(null) }
+  }
+
+  return <><div className="page-heading report-heading"><div><h1>Relatório de atendimentos</h1><p>Análise detalhada da operação comercial, conversão e resultados gerados.</p></div><div className="report-actions"><button className="outline-button excel-button" disabled={Boolean(exporting)} onClick={() => void exportExcel()}><FileSpreadsheet size={17} />{exporting === 'excel' ? 'Gerando…' : 'Excel detalhado'}</button><button className="gold-button" disabled={Boolean(exporting)} onClick={() => void exportPdf()}><FileText size={17} />{exporting === 'pdf' ? 'Gerando…' : 'PDF completo'}</button><button className="period-button" onClick={remote.reload}><RefreshCw size={15} /> Atualizar</button></div></div>{exportError && <div className="inline-warning">{exportError}</div>}
+    <section className="attendance-report-metrics"><article><span>Total de atendimentos</span><strong>{attendances.length}</strong><small>{open} em andamento</small></article><article><span>Taxa de conversão</span><strong>{conversion}%</strong><small>{completed.length} concluídos</small></article><article><span>Valor negociado</span><strong>{moneyValue(totalValue)}</strong><small>Gerado pelos atendimentos</small></article><article><span>Agendamentos</span><strong>{schedules.length}</strong><small>No ano corrente</small></article></section>
+    <section className="report-detail-grid"><article className="panel"><div className="panel-heading"><h2>Evolução mensal</h2><span>Atendimentos / concluídos</span></div><div className="report-month-list">{monthRows.map((item) => <div key={item.month}><span>{item.month}</span><div><i style={{ width: `${attendances.length ? item.count / Math.max(...monthRows.map((row) => row.count), 1) * 100 : 0}%` }} /></div><strong>{item.count} / {item.completed}</strong></div>)}</div></article><article className="panel"><div className="panel-heading"><h2>Status dos atendimentos</h2><span>Distribuição atual</span></div><div className="report-status-list">{statusCounts.map(([status, count]) => <div key={status}><span>{status}</span><strong>{count}</strong><small>{attendances.length ? Math.round(count / attendances.length * 100) : 0}%</small></div>)}</div></article></section>
+    <article className="panel attendance-report-table"><div className="panel-heading"><div><h2>Detalhamento profissional</h2><span>Cliente, atendimento, responsável, empreendimento e resultado</span></div><span>{rows.length} registros</span></div><div className="table-scroll"><table className="data-table"><thead><tr><th>Data / Cliente</th><th>Tipo / Responsável</th><th>Empreendimento</th><th>Status</th><th>Valor</th></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.Cliente}-${index}`}><td><strong>{row.Cliente}</strong><small>{row.Data}</small></td><td><strong>{row.Tipo}</strong><small>{row.Responsável}</small></td><td>{row.Empreendimento}</td><td><span className="status-chip">{row.Status}</span></td><td><strong>{moneyValue(row.Valor)}</strong></td></tr>)}</tbody></table>{!rows.length && <div className="empty">Nenhum atendimento encontrado.</div>}</div></article>
+  </>
 }
 
 function Login({ onLogin }: { onLogin: (session: PublicSession) => void }) {
@@ -285,7 +523,7 @@ function App() {
     <aside className={`sidebar ${sidebarOpen ? 'is-open' : ''}`}><div className="sidebar-top"><Brand /><button className="close-sidebar" onClick={() => setSidebarOpen(false)}><X /></button></div><button className="collapse-button"><ChevronLeft size={18} /></button><nav>{sections.map(({ id, label, icon: Icon }) => <button className={activeId === id ? 'active' : ''} key={id} onClick={() => navigate(id)}><Icon size={20} /><span>{label}</span></button>)}</nav><div className="sidebar-bottom"><button onClick={() => navigate('configuracoes')}><Settings size={20} /><span>Configurações</span></button><div className="user-mini"><div className="avatar">{initials(userName)}</div><div><strong>{userName}</strong><span>{session.user.role ?? 'Usuário'}</span></div></div></div></aside>
     {sidebarOpen && <button className="sidebar-scrim" onClick={() => setSidebarOpen(false)} />}
     <div className="workspace"><header className="topbar"><button className="menu-button" onClick={() => setSidebarOpen(true)}><Menu /></button><label className="search-box"><Search size={19} /><input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && activeId === 'dashboard') navigate('leads') }} placeholder="Buscar no módulo atual…" />{query && <button onClick={() => setQuery('')}><X size={16} /></button>}</label><div className="top-actions"><TopbarNotifications refreshKey={refreshKey} onOpenAgenda={() => navigate('agenda')} /><button className="profile-button" onClick={() => navigate('configuracoes')}>{initials(userName)}</button></div></header>
-      <main>{activeId === 'dashboard' ? <Dashboard refreshKey={refreshKey} /> : activeId === 'agenda' ? <CalendarPage refreshKey={refreshKey} /> : activeId === 'atendimentos' ? <AttendancesPage session={session} refreshKey={refreshKey} /> : activeId === 'leads' ? <LeadsPage search={search} refreshKey={refreshKey} /> : activeId === 'oportunidades' ? <OpportunitiesPage search={search} refreshKey={refreshKey} onNavigate={navigate} /> : activeId === 'fluxo' ? <OperationalFlow refreshKey={refreshKey} onNavigate={navigate} /> : activeId === 'campanhas' ? <CampaignsPage /> : endpoints[activeId] ? <ResourcePage section={activeSection} search={search} refreshKey={refreshKey} /> : activeId === 'relatorios' ? <Reports refreshKey={refreshKey} /> : <SettingsPage session={session} onSessionChange={setSession} onLogout={logout} />}</main>
+      <main>{activeId === 'dashboard' ? <Dashboard refreshKey={refreshKey} onNavigate={navigate} /> : activeId === 'agenda' ? <CalendarPage refreshKey={refreshKey} /> : activeId === 'atendimentos' ? <AttendancesPage session={session} refreshKey={refreshKey} /> : activeId === 'leads' ? <LeadsPage search={search} refreshKey={refreshKey} /> : activeId === 'oportunidades' ? <OpportunitiesPage search={search} refreshKey={refreshKey} onNavigate={navigate} /> : activeId === 'fluxo' ? <OperationalFlow refreshKey={refreshKey} onNavigate={navigate} /> : activeId === 'campanhas' ? <CampaignsPage /> : endpoints[activeId] ? <ResourcePage section={activeSection} search={search} refreshKey={refreshKey} /> : activeId === 'relatorios' ? <Reports refreshKey={refreshKey} /> : <SettingsPage session={session} onSessionChange={setSession} onLogout={logout} />}</main>
     </div>
   </div>
 }

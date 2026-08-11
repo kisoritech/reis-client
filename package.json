@@ -30,9 +30,11 @@
   "dependencies": {
     "@tanstack/react-query": "^5.101.4",
     "electron-squirrel-startup": "^1.0.1",
+    "jspdf": "^4.2.1",
     "lucide-react": "^1.27.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
+    "xlsx": "^0.18.5",
     "zod": "^4.4.3"
   },
   "devDependencies": {

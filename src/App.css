@@ -255,6 +255,41 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
 .metric-card small { margin-top: 7px; color: var(--success); font-size: 14px; }
 
 .dashboard-grid { display: grid; grid-template-columns: minmax(0, 2.05fr) minmax(320px, 1fr); gap: 19px; margin-top: 30px; }
+.results-dashboard { align-items: stretch; }
+.results-dashboard .panel-heading > div:first-child { display: grid; gap: 4px; }
+.results-dashboard .panel-heading button { font-weight: 700; }
+.delivery-panel, .outcome-panel { min-height: 410px; }
+.chart-periods { display: flex !important; padding: 3px; gap: 2px !important; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-soft); }
+.chart-periods button { padding: 6px 9px; border-radius: 6px; color: var(--muted); text-transform: capitalize; }
+.chart-periods button.active { color: var(--on-gold); background: var(--gold); }
+.delivery-legend { display: flex; justify-content: flex-end; gap: 18px; margin-top: 22px; color: var(--muted); font-size: 12px; }
+.delivery-legend span { display: flex; align-items: center; gap: 6px; }
+.delivery-legend i, .summary-list i { width: 9px; height: 9px; display: inline-block; border-radius: 50%; }
+.attendance-dot { background: #8f7420; }
+.delivery-dot, .success-dot { background: var(--gold-bright); }
+.progress-dot { background: #8f7420; }
+.lost-dot { background: var(--danger-text); }
+.delivery-chart { height: 250px; margin-top: 15px; padding: 24px 12px 0; display: flex; align-items: stretch; gap: 16px; border-bottom: 1px solid var(--border); background: repeating-linear-gradient(to bottom, transparent 0, transparent calc(25% - 1px), var(--border) 25%); }
+.delivery-column { min-width: 0; flex: 1; display: grid; grid-template-rows: 1fr 27px; gap: 8px; text-align: center; }
+.delivery-bars { min-height: 0; display: flex; align-items: flex-end; justify-content: center; gap: 5px; }
+.delivery-bars > span { position: relative; width: min(34px, 42%); min-height: 0; border-radius: 7px 7px 2px 2px; background: linear-gradient(#a88c35, #655115); transition: height .3s ease; }
+.delivery-bars > span + span { background: linear-gradient(#f0ce59, #b58b16); }
+.delivery-bars b { position: absolute; inset: -20px 0 auto; color: var(--muted); font-size: 11px; }
+.delivery-column small { color: var(--muted); text-transform: capitalize; }
+.outcome-ring { width: 174px; aspect-ratio: 1; margin: 34px auto 28px; display: grid; place-content: center; border-radius: 50%; background: radial-gradient(circle at center, var(--surface) 0 57%, transparent 58%), conic-gradient(var(--gold-bright) var(--completed), var(--track-bg) 0); text-align: center; }
+.outcome-ring strong { font-size: 30px; }
+.outcome-ring span { color: var(--muted); font-size: 12px; }
+.outcome-panel .summary-list span { display: flex; align-items: center; gap: 9px; }
+.agenda-panel, .recent-attendance-panel { min-height: 300px; }
+.dashboard-agenda-list, .recent-attendance-list { margin-top: 17px; display: grid; }
+.dashboard-agenda-list > button, .recent-attendance-list > button { width: 100%; padding: 12px 8px; display: grid; align-items: center; gap: 13px; border: 0; border-bottom: 1px solid var(--border); color: var(--text); background: transparent; text-align: left; cursor: pointer; }
+.dashboard-agenda-list > button { grid-template-columns: 48px minmax(0, 1fr) auto; }
+.recent-attendance-list > button { grid-template-columns: minmax(0, 1fr) auto; }
+.dashboard-agenda-list time { min-height: 48px; display: grid; place-content: center; border-radius: 10px; color: var(--gold-bright); background: var(--gold-dark); text-align: center; }
+.dashboard-agenda-list time strong { font-size: 19px; line-height: 1; }
+.dashboard-agenda-list time span { color: var(--muted); font-size: 10px; text-transform: uppercase; }
+.dashboard-agenda-list button > div, .recent-attendance-list button > div { min-width: 0; display: grid; gap: 5px; }
+.dashboard-agenda-list button > div span, .recent-attendance-list button > div span { overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .panel { border: 1px solid var(--border); border-radius: 16px; background: linear-gradient(145deg, rgba(255,255,255,.012), transparent 45%), var(--surface); padding: 26px; box-shadow: 0 15px 40px var(--shadow); }
 .panel h2 { margin: 0; font-family: var(--display-font); font-size: 20px; font-weight: 600; }
 .panel-heading { display: flex; align-items: center; justify-content: space-between; }
@@ -341,10 +376,32 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
 .summary-list strong { color: var(--text); font-size: 20px; }
 .wide-panel { grid-column: 1 / -1; }
 .report-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 19px; }
+.report-actions { display: flex; align-items: center; gap: 10px; }
+.report-actions button { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.excel-button { color: var(--success); border-color: rgba(0,232,121,.35); }
+.report-actions button:disabled { opacity: .55; cursor: wait; }
 .report-grid dl { display: grid; gap: 12px; margin: 25px 0 0; }
 .report-grid dl div { display: flex; justify-content: space-between; padding-bottom: 10px; border-bottom: 1px solid #30280c; }
 .report-grid dt { color: var(--muted); text-transform: capitalize; }
 .report-grid dd { margin: 0; font-weight: 700; }
+.attendance-report-metrics { margin-bottom: 19px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 19px; }
+.attendance-report-metrics article { min-height: 125px; padding: 21px; display: grid; align-content: center; gap: 6px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+.attendance-report-metrics span { color: var(--muted); font-size: 12px; text-transform: uppercase; }
+.attendance-report-metrics strong { font-size: 26px; }
+.attendance-report-metrics small { color: var(--success); }
+.report-detail-grid { margin-bottom: 19px; display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); gap: 19px; }
+.report-month-list, .report-status-list { margin-top: 22px; display: grid; gap: 10px; }
+.report-month-list > div { display: grid; grid-template-columns: 76px minmax(80px, 1fr) 52px; align-items: center; gap: 10px; }
+.report-month-list span { color: var(--muted); font-size: 12px; text-transform: capitalize; }
+.report-month-list > div > div { height: 8px; overflow: hidden; border-radius: 5px; background: var(--track-bg); }
+.report-month-list i { height: 100%; display: block; border-radius: inherit; background: linear-gradient(90deg, #9d7713, var(--gold-bright)); }
+.report-month-list strong { text-align: right; font-size: 12px; }
+.report-status-list > div { padding: 10px 12px; display: grid; grid-template-columns: minmax(0, 1fr) auto 42px; gap: 10px; border-radius: 9px; background: var(--surface-soft); }
+.report-status-list span { text-transform: capitalize; }
+.report-status-list small { color: var(--muted); text-align: right; }
+.attendance-report-table { margin-top: 0; }
+.attendance-report-table .table-scroll { margin-top: 18px; }
+.attendance-report-table td small { display: block; margin-top: 5px; color: var(--muted); }
 .dialog-backdrop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 20px; overflow-y: auto; background: rgba(0,0,0,.75); backdrop-filter: blur(5px); }
 .dialog { width: min(470px, 100%); max-height: calc(100dvh - 40px); overflow-y: auto; display: grid; gap: 18px; padding: 28px; border: 1px solid var(--border); border-radius: 20px; background: var(--surface); box-shadow: 0 30px 80px #000; }
 .icon-button { border: 0; color: var(--muted); background: none; cursor: pointer; }
@@ -654,6 +711,8 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
 }
 
 @media (max-width: 1200px) {
+  .attendance-report-metrics { grid-template-columns: repeat(2, 1fr); }
+  .report-detail-grid { grid-template-columns: 1fr; }
   .sidebar { width: 245px; min-width: 245px; }
   .workspace { width: calc(100% - 245px); margin-left: 245px; }
   .metrics-grid { grid-template-columns: repeat(2, 1fr); }
@@ -663,6 +722,14 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
 }
 
 @media (max-width: 760px) {
+  .attendance-report-metrics { grid-template-columns: 1fr; }
+  .report-actions { width: 100%; flex-wrap: wrap; }
+  .report-actions .outline-button, .report-actions .gold-button { flex: 1 1 150px; }
+  .report-actions .period-button { display: none; }
+  .delivery-panel .panel-heading { align-items: flex-start; gap: 14px; flex-direction: column; }
+  .chart-periods { width: 100%; }
+  .chart-periods button { flex: 1; }
+  .delivery-chart { gap: 7px; padding-inline: 2px; }
   .sidebar { transform: translateX(-100%); transition: transform .25s ease; box-shadow: 20px 0 50px #000; }
   .sidebar.is-open { transform: translateX(0); }
   .close-sidebar { display: block; margin-left: auto; cursor: pointer; }
@@ -736,6 +803,9 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
 }
 
 @media (max-width: 480px) {
+  .dashboard-agenda-list > button { grid-template-columns: 44px minmax(0, 1fr); }
+  .dashboard-agenda-list > button > .status-chip { display: none; }
+  .outcome-ring { width: 150px; }
   .topbar { gap: 8px; padding: 0 10px; }
   .search-box { min-width: 0; }
   .search-box input { min-width: 0; }
