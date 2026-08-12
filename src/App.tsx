@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, FormEvent } from 'react'
 import {
-  BarChart3, Bell, CheckCircle2, ChevronLeft, CircleDollarSign, Clock3, GitBranch,
+  BarChart3, Bell, CheckCircle2, ChevronLeft, CircleDollarSign, Clock3,
   CalendarCheck2, CalendarDays, ClipboardList, FileSpreadsheet, FileText, LayoutDashboard, MapPin, Megaphone, Menu, RefreshCw, Search, Settings, Target,
   UsersRound, X,
 } from 'lucide-react'
@@ -15,8 +15,6 @@ import {
   SESSION_EXPIRED_EVENT,
 } from './api'
 import SettingsPage from './Settings'
-import LeadsPage from './Leads'
-import OperationalFlow from './OperationalFlow'
 import CalendarPage from './Calendar'
 import AttendancesPage from './Attendances'
 import OpportunitiesPage from './Opportunities'
@@ -48,9 +46,7 @@ const sections: Section[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'agenda', label: 'Agenda', icon: CalendarDays },
   { id: 'atendimentos', label: 'Atendimentos', icon: ClipboardList },
-  { id: 'leads', label: 'Leads', icon: UsersRound },
   { id: 'oportunidades', label: 'Oportunidades', icon: Target },
-  { id: 'fluxo', label: 'Fluxo Operacional', icon: GitBranch },
   { id: 'campanhas', label: 'Campanhas', icon: Megaphone },
   { id: 'relatorios', label: 'Relatórios', icon: BarChart3 },
 ]
@@ -522,8 +518,8 @@ function App() {
   return <div className="app-shell">
     <aside className={`sidebar ${sidebarOpen ? 'is-open' : ''}`}><div className="sidebar-top"><Brand /><button className="close-sidebar" onClick={() => setSidebarOpen(false)}><X /></button></div><button className="collapse-button"><ChevronLeft size={18} /></button><nav>{sections.map(({ id, label, icon: Icon }) => <button className={activeId === id ? 'active' : ''} key={id} onClick={() => navigate(id)}><Icon size={20} /><span>{label}</span></button>)}</nav><div className="sidebar-bottom"><button onClick={() => navigate('configuracoes')}><Settings size={20} /><span>Configurações</span></button><div className="user-mini"><div className="avatar">{initials(userName)}</div><div><strong>{userName}</strong><span>{session.user.role ?? 'Usuário'}</span></div></div></div></aside>
     {sidebarOpen && <button className="sidebar-scrim" onClick={() => setSidebarOpen(false)} />}
-    <div className="workspace"><header className="topbar"><button className="menu-button" onClick={() => setSidebarOpen(true)}><Menu /></button><label className="search-box"><Search size={19} /><input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && activeId === 'dashboard') navigate('leads') }} placeholder="Buscar no módulo atual…" />{query && <button onClick={() => setQuery('')}><X size={16} /></button>}</label><div className="top-actions"><TopbarNotifications refreshKey={refreshKey} onOpenAgenda={() => navigate('agenda')} /><button className="profile-button" onClick={() => navigate('configuracoes')}>{initials(userName)}</button></div></header>
-      <main>{activeId === 'dashboard' ? <Dashboard refreshKey={refreshKey} onNavigate={navigate} /> : activeId === 'agenda' ? <CalendarPage refreshKey={refreshKey} /> : activeId === 'atendimentos' ? <AttendancesPage session={session} refreshKey={refreshKey} /> : activeId === 'leads' ? <LeadsPage search={search} refreshKey={refreshKey} /> : activeId === 'oportunidades' ? <OpportunitiesPage search={search} refreshKey={refreshKey} onNavigate={navigate} /> : activeId === 'fluxo' ? <OperationalFlow refreshKey={refreshKey} onNavigate={navigate} /> : activeId === 'campanhas' ? <CampaignsPage /> : endpoints[activeId] ? <ResourcePage section={activeSection} search={search} refreshKey={refreshKey} /> : activeId === 'relatorios' ? <Reports refreshKey={refreshKey} /> : <SettingsPage session={session} onSessionChange={setSession} onLogout={logout} />}</main>
+    <div className="workspace"><header className="topbar"><button className="menu-button" onClick={() => setSidebarOpen(true)}><Menu /></button><label className="search-box"><Search size={19} /><input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && activeId === 'dashboard') navigate('atendimentos') }} placeholder="Buscar no módulo atual…" />{query && <button onClick={() => setQuery('')}><X size={16} /></button>}</label><div className="top-actions"><TopbarNotifications refreshKey={refreshKey} onOpenAgenda={() => navigate('agenda')} /><button className="profile-button" onClick={() => navigate('configuracoes')}>{initials(userName)}</button></div></header>
+      <main>{activeId === 'dashboard' ? <Dashboard refreshKey={refreshKey} onNavigate={navigate} /> : activeId === 'agenda' ? <CalendarPage refreshKey={refreshKey} /> : activeId === 'atendimentos' ? <AttendancesPage session={session} refreshKey={refreshKey} search={search} onNavigate={navigate} /> : activeId === 'oportunidades' ? <OpportunitiesPage search={search} refreshKey={refreshKey} onNavigate={navigate} /> : activeId === 'campanhas' ? <CampaignsPage session={session} /> : endpoints[activeId] ? <ResourcePage section={activeSection} search={search} refreshKey={refreshKey} /> : activeId === 'relatorios' ? <Reports refreshKey={refreshKey} /> : <SettingsPage session={session} onSessionChange={setSession} onLogout={logout} />}</main>
     </div>
   </div>
 }

@@ -1,5 +1,14 @@
 # Contrato proposto para campanhas WhatsApp
 
+## Agenda automática por perfil
+
+A tela de Campanhas é uma central somente de leitura da agenda executada pelo job de WhatsApp:
+
+- `GET /automation/messages/schedules?channel=whatsapp`: exclusivo do perfil `dev`; retorna todos os jobs, destinatários, telefone mascarado, horário, estado, última execução e erro.
+- `GET /automation/messages/schedules/me?channel=whatsapp`: disponível aos demais usuários; usa exclusivamente o ID da sessão e retorna apenas os agendamentos destinados ao próprio WhatsApp.
+
+O endpoint pessoal não deve aceitar `userId`, telefone ou empresa por query string. O backend obtém essas informações da sessão, mascara o número e não retorna dados de outros destinatários. Ambos os endpoints devem refletir o estado persistido da fila (`scheduled`, `queued`, `running`, `sent`, `delivered`, `failed` ou `cancelled`) e o horário real da próxima execução do job.
+
 O Swagger publicado em 05/08/2026 expõe as rotas, mas documenta `CreateCampaignDto`, `ScheduleCampaignDto`, `GenerateNegotiationMessagesDto` e `ProcessMessageQueueDto` com `properties: {}`. O backend deve publicar e validar o contrato abaixo antes da homologação.
 
 ## Criação
@@ -44,6 +53,33 @@ Regras obrigatórias do servidor:
 - registrar auditoria sem tokens ou payloads sensíveis.
 
 ## Preview
+
+## Catálogo de templates WhatsApp
+
+O cliente nunca acessa a Meta diretamente nem recebe o token do WhatsApp. A API REIS deve consultar a WhatsApp Business Management API usando a credencial armazenada no servidor.
+
+- `GET /automation/messages/templates?channel=whatsapp`: retorna os templates sincronizados, incluindo `id`, `name`, `language`, `category`, `status` e `components`.
+- `POST /automation/messages/templates/sync`: força a sincronização com a Meta e persiste o catálogo atualizado.
+
+Somente templates com status `APPROVED` podem ser apresentados para envio. Ao criar e iniciar a campanha, o servidor deve validar novamente o ID, nome, idioma, status e os parâmetros exigidos pelo template.
+
+### Público de usuários internos
+
+Para campanhas direcionadas aos usuários ativos da própria organização, o cliente envia:
+
+```json
+{
+  "audience": {
+    "source": "organization_users",
+    "userIds": ["uuid-do-usuario"],
+    "requireOptIn": true,
+    "excludeOptOut": true,
+    "requireValidPhone": true
+  }
+}
+```
+
+O servidor deve validar que cada usuário pertence à empresa da sessão, está ativo, possui telefone normalizado e consentimento válido. IDs inválidos ou de outra empresa devem ser rejeitados, nunca ignorados silenciosamente.
 
 `POST /api/v1/automation/campaigns/{id}/preview`
 
@@ -113,4 +149,3 @@ Cada item deve ter `campaignId`, `accountId`, telefone normalizado, template/ver
 - `POST /automation/campaigns/{id}/cancel`
 - `GET /automation/campaigns/{id}/results`
 - `GET /automation/messages/provider/status`
-

@@ -5,6 +5,8 @@ import {
 } from 'lucide-react'
 import type { PublicSession } from '../electron/contracts'
 import { apiRequest, mutationKey, ReisApiError } from './api'
+import LeadsPage from './Leads'
+import OperationalFlow from './OperationalFlow'
 
 type CatalogItem = {
   id: string
@@ -33,6 +35,8 @@ type Attendance = Record<string, unknown> & {
   tipoAtendimento?: RelatedItem
   valorNegociacao?: Money
   observacoes?: string
+  foto?: { url?: string; mimeType?: string | null }
+  fotoUrl?: string
   createdAt?: string
 }
 type AttendanceList = {
@@ -72,7 +76,30 @@ function apiErrorMessage(reason: unknown, fallback: string) {
   return reason.message
 }
 
-export default function AttendancesPage({ session, refreshKey }: { session: PublicSession; refreshKey: number }) {
+function attendancePhoto(attendance: Attendance) {
+  return attendance.foto?.url ?? attendance.fotoUrl
+}
+
+function AttendancePhoto({ attendance, compact = false }: { attendance: Attendance; compact?: boolean }) {
+  const url = attendancePhoto(attendance)
+  if (!url) return compact
+    ? <span className="attendance-photo-empty" title="Sem imagem vinculada"><Camera size={16} /></span>
+    : <div className="attendance-photo-placeholder"><Camera size={28} /><span>Nenhuma imagem vinculada a este atendimento.</span></div>
+  return <a className={compact ? 'attendance-photo-thumb' : 'attendance-photo-view'} href={url} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} title="Abrir imagem do atendimento">
+    <img src={url} alt={`Imagem do atendimento de ${attendance.cliente?.nome ?? 'cliente'}`} loading="lazy" />
+    {!compact && <span>Abrir imagem original</span>}
+  </a>
+}
+
+type AttendanceWorkspace = 'records' | 'leads' | 'flow'
+
+export default function AttendancesPage({ session, refreshKey, search, onNavigate }: {
+  session: PublicSession
+  refreshKey: number
+  search: string
+  onNavigate: (id: string) => void
+}) {
+  const [workspace, setWorkspace] = useState<AttendanceWorkspace>('records')
   const [mode, setMode] = useState<'list' | 'form'>('list')
   const [items, setItems] = useState<Attendance[]>([])
   const [catalogs, setCatalogs] = useState<Catalogs>(emptyCatalogs)
@@ -131,13 +158,25 @@ export default function AttendancesPage({ session, refreshKey }: { session: Publ
       setError(apiErrorMessage(reason, 'Não foi possível abrir o atendimento'))
     }
   }
+  const workspaceNavigation = (id: string) => {
+    if (id === 'leads') setWorkspace('leads')
+    else if (id === 'fluxo' || id === 'atendimentos') setWorkspace(id === 'fluxo' ? 'flow' : 'records')
+    else onNavigate(id)
+  }
+  const tabs = <nav className="attendance-workspace-tabs" aria-label="Operação de atendimentos">
+    <button type="button" className={workspace === 'records' ? 'active' : ''} onClick={() => setWorkspace('records')}>Atendimentos</button>
+    <button type="button" className={workspace === 'leads' ? 'active' : ''} onClick={() => setWorkspace('leads')}>Leads vinculados</button>
+    <button type="button" className={workspace === 'flow' ? 'active' : ''} onClick={() => setWorkspace('flow')}>Fluxo &amp; comunicação</button>
+  </nav>
+  if (workspace === 'leads') return <section className="attendance-workspace">{tabs}<LeadsPage search={search} refreshKey={refreshKey} /></section>
+  if (workspace === 'flow') return <section className="attendance-workspace">{tabs}<OperationalFlow refreshKey={refreshKey} onNavigate={workspaceNavigation} /></section>
   if (mode === 'form') return <AttendanceForm session={session} catalogs={catalogs} developments={developments} users={users} onCancel={() => setMode('list')} onCreated={() => { setMode('list'); setVersion((value) => value + 1) }} />
-  return <section className="attendance-page"><div className="page-heading"><div><h1>Atendimentos</h1><p>{items.length} registros comerciais encontrados.</p></div><button className="gold-button attendance-create" onClick={() => setMode('form')}><Plus size={18} /> Novo atendimento</button></div>
+  return <section className="attendance-page">{tabs}<div className="page-heading"><div><h1>Atendimentos</h1><p>{items.length} registros comerciais encontrados.</p></div><button className="gold-button attendance-create" onClick={() => setMode('form')}><Plus size={18} /> Novo atendimento</button></div>
     {selected && <AttendanceDetails attendance={selected} onClose={() => setSelected(null)} onChanged={() => { setSelected(null); setVersion((value) => value + 1) }} />}
     <article className="panel attendance-list-panel"><div className="attendance-list-toolbar"><label><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar no histórico…" /></label><button type="button" onClick={() => setVersion((value) => value + 1)}><RefreshCw size={16} /> Atualizar</button></div>
       {loading && <div className="state-panel"><RefreshCw className="spin" /><span>Consultando atendimentos…</span></div>}
       {error && <div className="state-panel error"><strong>Não foi possível carregar</strong><span>{error}</span><button onClick={() => setVersion((value) => value + 1)}>Tentar novamente</button></div>}
-      {!loading && !error && <div className="table-scroll"><table className="data-table attendance-table"><thead><tr><th>Data</th><th>Cliente</th><th>Empreendimento</th><th>Tipo</th><th>Responsável</th><th>Valor</th><th>Status</th></tr></thead><tbody>{filtered.map((item) => <tr key={item.id} onClick={() => void openAttendance(item)}><td>{item.createdAt ? new Date(item.createdAt).toLocaleDateString('pt-BR') : '—'}</td><td>{item.cliente?.nome ?? 'Não informado'}</td><td>{item.empreendimento?.nome ?? 'Não informado'}</td><td>{item.tipoAtendimento?.nome ?? 'Não informado'}</td><td>{item.responsavel?.nome ?? 'Não informado'}</td><td>{item.valorNegociacao === undefined ? '—' : money(item.valorNegociacao)}</td><td><span className="status-chip">{item.status ?? 'aberto'}</span></td></tr>)}</tbody></table>{!filtered.length && <div className="empty">Nenhum atendimento encontrado.</div>}</div>}
+      {!loading && !error && <div className="table-scroll"><table className="data-table attendance-table"><thead><tr><th>Data</th><th>Cliente</th><th>Empreendimento</th><th>Tipo</th><th>Responsável</th><th>Valor</th><th>Status</th><th>Imagem</th></tr></thead><tbody>{filtered.map((item) => <tr key={item.id} onClick={() => void openAttendance(item)}><td>{item.createdAt ? new Date(item.createdAt).toLocaleDateString('pt-BR') : '—'}</td><td>{item.cliente?.nome ?? 'Não informado'}</td><td>{item.empreendimento?.nome ?? 'Não informado'}</td><td>{item.tipoAtendimento?.nome ?? 'Não informado'}</td><td>{item.responsavel?.nome ?? 'Não informado'}</td><td>{item.valorNegociacao === undefined ? '—' : money(item.valorNegociacao)}</td><td><span className="status-chip">{item.status ?? 'aberto'}</span></td><td><AttendancePhoto attendance={item} compact /></td></tr>)}</tbody></table>{!filtered.length && <div className="empty">Nenhum atendimento encontrado.</div>}</div>}
     </article>
   </section>
 }
@@ -156,7 +195,7 @@ function AttendanceDetails({ attendance, onClose, onChanged }: { attendance: Att
       setWorking(false)
     }
   }
-  return <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><div className="dialog attendance-details"><div className="panel-heading"><div><span className="status-chip">{attendance.status ?? 'aberto'}</span><h2>{attendance.cliente?.nome ?? 'Atendimento'}</h2><p>{attendance.tipoAtendimento?.nome ?? 'Atendimento comercial'}</p></div><button type="button" className="icon-button" onClick={onClose}>×</button></div><dl className="opportunity-detail-grid"><div><dt>Empreendimento</dt><dd>{attendance.empreendimento?.nome ?? 'Não informado'}</dd></div><div><dt>Responsável</dt><dd>{attendance.responsavel?.nome ?? 'Não informado'}</dd></div><div><dt>Valor potencial</dt><dd>{attendance.valorNegociacao === undefined ? 'Não informado' : money(attendance.valorNegociacao)}</dd></div><div><dt>Data</dt><dd>{attendance.createdAt ? new Date(attendance.createdAt).toLocaleString('pt-BR') : 'Não informada'}</dd></div></dl>{attendance.observacoes && <div className="review-notes"><strong>Observações</strong><p>{attendance.observacoes}</p></div>}{error && <div className="form-error">{error}</div>}<div className="dialog-actions">{attendance.status !== 'cancelado' && <button type="button" className="outline-button danger-action" disabled={working} onClick={() => void updateStatus('cancelado')}>Cancelar</button>}{attendance.status !== 'concluido' && <button type="button" className="outline-button success-action" disabled={working} onClick={() => void updateStatus('concluido')}>Concluir</button>}<button type="button" className="gold-button" disabled={working} onClick={onClose}>Fechar</button></div></div></div>
+  return <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><div className="dialog attendance-details"><div className="panel-heading"><div><span className="status-chip">{attendance.status ?? 'aberto'}</span><h2>{attendance.cliente?.nome ?? 'Atendimento'}</h2><p>{attendance.tipoAtendimento?.nome ?? 'Atendimento comercial'}</p></div><button type="button" className="icon-button" onClick={onClose}>×</button></div><dl className="opportunity-detail-grid"><div><dt>Empreendimento</dt><dd>{attendance.empreendimento?.nome ?? 'Não informado'}</dd></div><div><dt>Responsável</dt><dd>{attendance.responsavel?.nome ?? 'Não informado'}</dd></div><div><dt>Valor potencial</dt><dd>{attendance.valorNegociacao === undefined ? 'Não informado' : money(attendance.valorNegociacao)}</dd></div><div><dt>Data</dt><dd>{attendance.createdAt ? new Date(attendance.createdAt).toLocaleString('pt-BR') : 'Não informada'}</dd></div></dl>{attendance.observacoes && <div className="review-notes"><strong>Observações</strong><p>{attendance.observacoes}</p></div>}<section className="attendance-photo-section"><strong>Imagem vinculada ao atendimento</strong><AttendancePhoto attendance={attendance} /></section>{error && <div className="form-error">{error}</div>}<div className="dialog-actions">{attendance.status !== 'cancelado' && <button type="button" className="outline-button danger-action" disabled={working} onClick={() => void updateStatus('cancelado')}>Cancelar</button>}{attendance.status !== 'concluido' && <button type="button" className="outline-button success-action" disabled={working} onClick={() => void updateStatus('concluido')}>Concluir</button>}<button type="button" className="gold-button" disabled={working} onClick={onClose}>Fechar</button></div></div></div>
 }
 
 function AttendanceForm({ session, catalogs, developments, users, onCancel, onCreated }: {

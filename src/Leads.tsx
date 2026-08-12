@@ -20,6 +20,16 @@ type LeadRow = Record<string, unknown> & {
   updatedAt?: string
   createdAt?: string
   _count?: { leads?: number; contatos?: number; oportunidades?: number }
+  totalAtendimentos?: number
+  atendimentosRecentes?: Array<{
+    id: string
+    status?: string
+    observacoes?: string
+    valorNegociacao?: number | null
+    createdAt?: string
+    tipoAtendimento?: { nome?: string }
+    empreendimento?: { nome?: string }
+  }>
   cliente?: {
     id: string
     nome?: string
@@ -219,6 +229,7 @@ function LeadDetails({ lead, statuses, onClose, onChanged }: { lead: LeadRow; st
     <dl className="opportunity-detail-grid"><div><dt>Origem</dt><dd>{lead.origem ?? 'Não informada'}</dd></div><div><dt>Prioridade</dt><dd>{lead.prioridade ?? 'Não definida'}</dd></div><div><dt>Score</dt><dd>{lead.score ?? 0}</dd></div><div><dt>Valor potencial</dt><dd>{formatPotential(lead)}</dd></div></dl>
     {lead.observacoes && <div className="review-notes"><strong>Observações</strong><p>{lead.observacoes}</p></div>}
     <div className="lead-status-editor"><label>Nova etapa<select value={statusId} onChange={(event) => setStatusId(event.target.value)}><option value="">Selecione…</option>{statuses.map((status) => <option value={status.id} key={status.id}>{status.nome}</option>)}</select></label><label>Motivo / contexto<input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Registre por que o lead mudou de etapa" /></label><button type="button" className="gold-button" disabled={working || !statusId} onClick={() => void saveStatus()}>Atualizar etapa</button></div>
+    <div className="lead-attendance-history"><div><strong>Atendimentos vinculados</strong><span>{lead.totalAtendimentos ?? lead.atendimentosRecentes?.length ?? 0} registro(s)</span></div>{lead.atendimentosRecentes?.length ? <ul>{lead.atendimentosRecentes.map((attendance) => <li key={attendance.id}><div><strong>{attendance.tipoAtendimento?.nome ?? 'Atendimento'}</strong><span className="status-chip">{attendance.status ?? 'aberto'}</span></div><small>{attendance.createdAt ? new Date(attendance.createdAt).toLocaleString('pt-BR') : 'Data não informada'}{attendance.empreendimento?.nome ? ` · ${attendance.empreendimento.nome}` : ''}{attendance.valorNegociacao ? ` · ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(attendance.valorNegociacao)}` : ''}</small>{attendance.observacoes && <p>{attendance.observacoes}</p>}</li>)}</ul> : <p className="settings-note">Nenhum atendimento vinculado.</p>}</div>
     <div className="lead-history"><strong>Histórico de etapas</strong>{history.length ? <ul>{history.map((item) => <li key={item.id}><span>{item.statusAnterior?.nome ?? 'Entrada'} → {item.statusNovo?.nome ?? 'Etapa'}</span><small>{new Date(item.createdAt).toLocaleString('pt-BR')}{item.usuario?.nome ? ` · ${item.usuario.nome}` : ''}{item.motivo ? ` · ${item.motivo}` : ''}</small></li>)}</ul> : <p className="settings-note">Nenhuma mudança de etapa registrada.</p>}</div>
     {error && <div className="form-error">{error}</div>}<div className="dialog-actions"><button type="button" className="outline-button" onClick={onClose}>Fechar</button></div>
   </div></div>
