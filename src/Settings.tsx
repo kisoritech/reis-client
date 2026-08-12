@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   Bell, CircleHelp, Database, Globe2, HelpCircle, LockKeyhole,
@@ -357,7 +357,7 @@ function IntegrationSettings({ onMessage }: { onMessage: (message: { kind: 'succ
   const [connectingGoogle, setConnectingGoogle] = useState(false)
   const [googleVerificationError, setGoogleVerificationError] = useState('')
   const connectionAttempt = useRef(0)
-  const verifyGoogle = async () => {
+  const verifyGoogle = useCallback(async () => {
     try {
       const result = await apiRequest<Record<string, unknown>>({ method: 'GET', path: '/integrations/google/calendar/verify' })
       setGoogle((current) => ({ ...current, ...result.data, status: 'active' }))
@@ -368,8 +368,8 @@ function IntegrationSettings({ onMessage }: { onMessage: (message: { kind: 'succ
       setGoogleVerificationError(message)
       return false
     }
-  }
-  const load = async () => {
+  }, [])
+  const load = useCallback(async () => {
     setLoading(true)
     const [googleResult, whatsappResult] = await Promise.allSettled([
       apiRequest<Record<string, unknown> | null>({ method: 'GET', path: '/integrations/google/calendar/status' }),
@@ -382,11 +382,11 @@ function IntegrationSettings({ onMessage }: { onMessage: (message: { kind: 'succ
       onMessage({ kind: 'error', text: 'A conexão está salva, mas o Google recusou o acesso ao calendário. Reconecte a conta.' })
     }
     setLoading(false)
-  }
+  }, [onMessage, verifyGoogle])
   useEffect(() => {
     void load()
     return () => { connectionAttempt.current += 1 }
-  }, [])
+  }, [load])
   const connectGoogle = async () => {
     const attempt = ++connectionAttempt.current
     setConnectingGoogle(true)
