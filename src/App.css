@@ -928,7 +928,7 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
   .chart-periods { width: 100%; }
   .chart-periods button { flex: 1; }
   .delivery-chart { gap: 7px; padding-inline: 2px; }
-  .sidebar { transform: translateX(-100%); transition: transform .25s ease; box-shadow: 20px 0 50px #000; }
+  .sidebar { transform: translateX(-100%); transition: transform .25s ease; box-shadow: none; }
   .sidebar.is-open { transform: translateX(0); }
   .close-sidebar { display: block; margin-left: auto; cursor: pointer; }
   .sidebar-top { display: flex; align-items: center; }
@@ -965,7 +965,7 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
   .chart-wrap { height: 210px; }
   .region-panel { overflow-x: auto; }
   .sellers-panel { overflow-x: auto; }
-  .sidebar-scrim { display: block; position: fixed; inset: 0; z-index: 25; border: 0; background: rgba(0,0,0,.65); }
+  .sidebar-scrim { display: block; position: fixed; inset: 0; z-index: 25; border: 0; background: transparent; }
   .report-grid { grid-template-columns: 1fr; }
   .settings-panel { align-items: flex-start; flex-direction: column; gap: 25px; }
   .login-card { padding: 28px 22px; }
