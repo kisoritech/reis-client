@@ -371,6 +371,45 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
 .module-card-icon { width: 64px; height: 64px; display: grid; place-items: center; border-radius: 18px; color: var(--gold); background: var(--gold-dark); }
 .module-card h2 { margin: 0 0 7px; }
 .module-card p { margin: 0; color: var(--muted); }
+.clients-workspace { display: grid; grid-template-columns: minmax(280px, .75fr) minmax(0, 1.65fr); gap: 18px; }
+.clients-list-panel, .client-history-panel { min-height: 520px; }
+.clients-list-panel { padding: 0; overflow: hidden; }
+.clients-list-panel > .panel-heading { min-height: 72px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
+.clients-list-panel .panel-heading > div { display: grid; gap: 3px; }
+.clients-list-panel .panel-heading svg { color: var(--muted); }
+.client-search-trigger { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid transparent; border-radius: 9px; color: var(--muted); background: transparent; cursor: pointer; }
+.client-search-trigger:hover, .client-search-trigger[aria-expanded="true"] { color: var(--gold-bright); border-color: var(--border); background: var(--gold-dark); }
+.client-search-box { height: 52px; padding: 7px 12px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); color: var(--muted); background: var(--surface-soft); }
+.client-search-box input { min-width: 0; flex: 1; height: 36px; padding: 0 4px; border: 0; outline: 0; color: var(--text); background: transparent; }
+.client-search-box button { width: 30px; height: 30px; display: grid; place-items: center; border: 0; border-radius: 8px; color: var(--muted); background: transparent; cursor: pointer; }
+.client-search-box button:hover { color: var(--text); background: var(--hover-bg); }
+.clients-list { max-height: 590px; overflow-y: auto; scrollbar-width: thin; }
+.clients-list > button { width: 100%; min-height: 72px; padding: 10px 14px; display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 12px; border: 0; border-bottom: 1px solid var(--border); color: var(--text); background: transparent; text-align: left; cursor: pointer; }
+.clients-list > button:hover, .clients-list > button.active { background: var(--gold-dark); }
+.clients-list > button.active { box-shadow: inset 3px 0 var(--gold); }
+.clients-list > button > i, .client-profile > i { display: grid; place-items: center; border-radius: 50%; color: var(--gold-bright); background: var(--gold-dark); font-style: normal; font-weight: 800; }
+.clients-list > button > i { width: 42px; height: 42px; font-size: 12px; }
+.clients-list > button > span { min-width: 0; display: grid; gap: 4px; }
+.clients-list > button small { overflow: hidden; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
+.clients-list > button > b { min-width: 28px; padding: 5px; border-radius: 99px; color: var(--gold-bright); background: var(--gold-dark); font-size: 11px; text-align: center; }
+.client-history-panel { overflow: hidden; }
+.client-profile { display: flex; align-items: center; gap: 14px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
+.client-profile > i { width: 54px; height: 54px; flex: 0 0 auto; }
+.client-profile > div { min-width: 0; display: grid; gap: 3px; }
+.client-profile h2 { margin: 0; font-family: var(--display-font); font-size: 25px; }
+.client-profile span, .client-contact-row { color: var(--muted); font-size: 13px; }
+.client-contact-row { min-height: 42px; padding: 12px 0; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; }
+.client-contact-row span { display: inline-flex; align-items: center; gap: 6px; }
+.client-history { max-height: 510px; overflow-y: auto; padding-right: 5px; scrollbar-width: thin; }
+.client-history h3 { margin: 10px 0 18px; display: flex; align-items: center; gap: 8px; font-size: 16px; }
+.client-history ol { margin: 0; padding: 0; display: grid; list-style: none; }
+.client-history li { position: relative; display: grid; grid-template-columns: 12px minmax(0, 1fr); gap: 12px; padding-bottom: 18px; }
+.history-line { width: 9px; height: 9px; z-index: 1; margin-top: 5px; border: 2px solid var(--surface); border-radius: 50%; background: var(--gold); box-shadow: 0 0 0 2px var(--gold); }
+.client-history li:not(:last-child)::before { content: ''; position: absolute; left: 4px; top: 13px; bottom: 0; width: 1px; background: var(--border); }
+.client-history li > div { min-width: 0; padding: 0 0 13px; border-bottom: 1px solid var(--border); }
+.client-history li header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.client-history time, .client-history li small { display: block; margin-top: 5px; color: var(--muted); font-size: 12px; }
+.client-history li p { margin: 9px 0 0; color: var(--text); font-size: 13px; line-height: 1.5; }
 .search-feedback { margin: -15px 0 25px; padding: 12px 15px; border: 1px solid var(--border); border-radius: 10px; color: var(--muted); background: var(--surface); }
 .sidebar-scrim { display: none; }
 
@@ -873,6 +912,7 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
   .workspace { width: calc(100% - 245px); margin-left: 245px; }
   .metrics-grid { grid-template-columns: repeat(2, 1fr); }
   .dashboard-grid { grid-template-columns: 1fr; }
+  .clients-workspace { grid-template-columns: minmax(250px, .8fr) minmax(0, 1.4fr); }
   .results-dashboard { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .results-dashboard .delivery-panel { grid-column: 1 / -1; }
   .status-panel { min-height: auto; }
@@ -908,6 +948,10 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
   .top-actions { gap: 10px; }
   main { padding: 24px 16px; }
   .metrics-grid { grid-template-columns: 1fr; }
+  .clients-workspace { grid-template-columns: 1fr; }
+  .clients-list-panel, .client-history-panel { min-height: auto; }
+  .clients-list { max-height: 330px; }
+  .client-history { max-height: none; }
   .results-dashboard { grid-template-columns: 1fr; }
   .results-dashboard .delivery-panel { grid-column: auto; }
   .metric-card { min-height: 120px; }

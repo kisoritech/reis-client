@@ -19,6 +19,7 @@ import CalendarPage from './Calendar'
 import AttendancesPage from './Attendances'
 import OpportunitiesPage from './Opportunities'
 import CampaignsPage from './Campaigns'
+import ClientsPage from './Clients'
 import './App.css'
 
 type Section = { id: string; label: string; icon: LucideIcon }
@@ -46,6 +47,7 @@ const sections: Section[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'agenda', label: 'Agenda', icon: CalendarDays },
   { id: 'atendimentos', label: 'Atendimentos', icon: ClipboardList },
+  { id: 'clientes', label: 'Clientes', icon: UsersRound },
   { id: 'oportunidades', label: 'Oportunidades', icon: Target },
   { id: 'campanhas', label: 'Campanhas', icon: Megaphone },
   { id: 'relatorios', label: 'Relatórios', icon: BarChart3 },
@@ -520,7 +522,7 @@ function App() {
     <aside className={`sidebar ${sidebarOpen ? 'is-open' : ''}`}><div className="sidebar-top"><Brand /><button className="close-sidebar" onClick={() => setSidebarOpen(false)} aria-label="Fechar menu"><X /></button></div><button type="button" className="collapse-button" onClick={() => setSidebarCollapsed((value) => !value)} aria-label={sidebarCollapsed ? 'Expandir barra lateral' : 'Recolher barra lateral'} aria-expanded={!sidebarCollapsed} title={sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'}>{sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}</button><nav>{sections.map(({ id, label, icon: Icon }) => <button className={activeId === id ? 'active' : ''} key={id} onClick={() => navigate(id)} title={sidebarCollapsed ? label : undefined}><Icon size={20} /><span>{label}</span></button>)}</nav><div className="sidebar-bottom"><button onClick={() => navigate('configuracoes')} title={sidebarCollapsed ? 'Configurações' : undefined}><Settings size={20} /><span>Configurações</span></button><div className="user-mini" title={sidebarCollapsed ? userName : undefined}><div className="avatar">{initials(userName)}</div><div><strong>{userName}</strong><span>{session.user.role ?? 'Usuário'}</span></div></div></div></aside>
     {sidebarOpen && <button className="sidebar-scrim" onClick={() => setSidebarOpen(false)} />}
     <div className="workspace"><header className="topbar"><button className="menu-button" onClick={() => setSidebarOpen(true)}><Menu /></button><label className="search-box"><Search size={19} /><input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && activeId === 'dashboard') navigate('atendimentos') }} placeholder="Buscar no módulo atual…" />{query && <button onClick={() => setQuery('')}><X size={16} /></button>}</label><div className="top-actions"><TopbarNotifications refreshKey={refreshKey} onOpenAgenda={() => navigate('agenda')} /><button className="profile-button" onClick={() => navigate('configuracoes')}>{initials(userName)}</button></div></header>
-      <main>{activeId === 'dashboard' ? <Dashboard refreshKey={refreshKey} onNavigate={navigate} /> : activeId === 'agenda' ? <CalendarPage refreshKey={refreshKey} /> : activeId === 'atendimentos' ? <AttendancesPage session={session} refreshKey={refreshKey} search={search} onNavigate={navigate} /> : activeId === 'oportunidades' ? <OpportunitiesPage search={search} refreshKey={refreshKey} onNavigate={navigate} /> : activeId === 'campanhas' ? <CampaignsPage session={session} /> : endpoints[activeId] ? <ResourcePage section={activeSection} search={search} refreshKey={refreshKey} /> : activeId === 'relatorios' ? <Reports refreshKey={refreshKey} /> : <SettingsPage session={session} onSessionChange={setSession} onLogout={logout} />}</main>
+      <main>{activeId === 'dashboard' ? <Dashboard refreshKey={refreshKey} onNavigate={navigate} /> : activeId === 'agenda' ? <CalendarPage refreshKey={refreshKey} /> : activeId === 'atendimentos' ? <AttendancesPage session={session} refreshKey={refreshKey} search={search} onNavigate={navigate} /> : activeId === 'clientes' ? <ClientsPage search={search} refreshKey={refreshKey} /> : activeId === 'oportunidades' ? <OpportunitiesPage search={search} refreshKey={refreshKey} onNavigate={navigate} /> : activeId === 'campanhas' ? <CampaignsPage session={session} /> : endpoints[activeId] ? <ResourcePage section={activeSection} search={search} refreshKey={refreshKey} /> : activeId === 'relatorios' ? <Reports refreshKey={refreshKey} /> : <SettingsPage session={session} onSessionChange={setSession} onLogout={logout} />}</main>
     </div>
   </div>
 }
