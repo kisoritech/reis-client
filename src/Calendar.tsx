@@ -119,7 +119,7 @@ export default function CalendarPage({ refreshKey }: { refreshKey: number }) {
     <div className="page-heading"><div><h1>Agenda</h1><p>Registre compromissos e acompanhe o cronograma operacional.</p></div><button className="gold-button calendar-create" onClick={() => setCreating(true)}><Plus size={18} /> Novo agendamento</button></div>
     {creating && <NewEventDialog initialDate={selectedDate} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); setVersion((value) => value + 1) }} />}
     {selectedEvent && <EventDetails event={selectedEvent} onClose={() => setSelectedEvent(null)} onChanged={() => { setSelectedEvent(null); setVersion((value) => value + 1) }} />}
-    <article className="panel calendar-panel">
+    <div className="calendar-workspace"><article className="panel calendar-panel">
       <div className="calendar-toolbar">
         <div className="calendar-period"><button type="button" onClick={() => changeMonth(-1)} aria-label="Mês anterior"><ChevronLeft /></button><button type="button" className="today-button" onClick={today}>Hoje</button><button type="button" onClick={() => changeMonth(1)} aria-label="Próximo mês"><ChevronRight /></button><h2>{month.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</h2></div>
         <div className="calendar-controls"><select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} aria-label="Filtrar por tipo"><option value="todos">Todos os tipos</option>{eventTypes.map((type) => <option key={type} value={type}>{type}</option>)}</select><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filtrar por status"><option value="todos">Todos os status</option>{statuses.map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}</select><div className="calendar-view-toggle"><button type="button" className={view === 'month' ? 'active' : ''} onClick={() => setView('month')}><CalendarDays size={16} /> Mês</button><button type="button" className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}><List size={16} /> Lista</button></div></div>
@@ -130,11 +130,12 @@ export default function CalendarPage({ refreshKey }: { refreshKey: number }) {
         const key = dateKey(day)
         const dayEvents = byDay[key] ?? []
         const outside = day.getMonth() !== month.getMonth()
-        return <button type="button" key={key} className={`calendar-day ${outside ? 'outside' : ''} ${key === selectedDate ? 'selected' : ''} ${key === dateKey(new Date()) ? 'today' : ''}`} onClick={() => setSelectedDate(key)}><span>{day.getDate()}</span><div>{dayEvents.slice(0, 3).map((event) => <i key={event.id} className={`event-${event.status ?? 'agendado'}`} onClick={(click) => { click.stopPropagation(); setSelectedEvent(event) }}><b>{formatTime(event.inicio)}</b> {event.titulo}</i>)}{dayEvents.length > 3 && <small>+ {dayEvents.length - 3} evento(s)</small>}</div></button>
+        const eventDescription = dayEvents.length === 1 ? '1 agendamento' : `${dayEvents.length} agendamentos`
+        return <button type="button" key={key} className={`calendar-day ${outside ? 'outside' : ''} ${key === selectedDate ? 'selected' : ''} ${key === dateKey(new Date()) ? 'today' : ''}`} onClick={() => setSelectedDate(key)} aria-label={`${day.toLocaleDateString('pt-BR')}, ${eventDescription}`}><span>{day.getDate()}</span>{dayEvents.length > 0 && <div className="calendar-event-dots" aria-hidden="true">{dayEvents.slice(0, 5).map((event) => <i key={event.id} className={`event-${event.status ?? 'agendado'}`} title={`${formatTime(event.inicio)} — ${event.titulo}`} />)}{dayEvents.length > 5 && <small>+{dayEvents.length - 5}</small>}</div>}</button>
       })}</div></div>}
       {!loading && !error && view === 'list' && <EventList events={filtered} onSelect={setSelectedEvent} />}
     </article>
-    {view === 'month' && <article className="panel selected-schedule"><div className="panel-heading"><h2>Cronograma de {new Date(`${selectedDate}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}</h2><button type="button" onClick={() => setCreating(true)}>+ Agendar neste dia</button></div><EventList events={selectedDayEvents} onSelect={setSelectedEvent} compact /></article>}
+    {view === 'month' && <article className="panel selected-schedule"><div className="panel-heading"><h2>Cronograma de {new Date(`${selectedDate}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}</h2><button type="button" onClick={() => setCreating(true)}>+ Agendar neste dia</button></div><EventList events={selectedDayEvents} onSelect={setSelectedEvent} compact /></article>}</div>
   </section>
 }
 

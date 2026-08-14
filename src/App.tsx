@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, FormEvent } from 'react'
 import {
-  BarChart3, Bell, CheckCircle2, ChevronLeft, CircleDollarSign, Clock3,
+  BarChart3, Bell, CheckCircle2, ChevronLeft, ChevronRight, CircleDollarSign, Clock3,
   CalendarCheck2, CalendarDays, ClipboardList, FileSpreadsheet, FileText, LayoutDashboard, MapPin, Megaphone, Menu, RefreshCw, Search, Settings, Target,
   UsersRound, X,
 } from 'lucide-react'
@@ -486,6 +486,7 @@ function App() {
   const [session, setSession] = useState<PublicSession | null | undefined>(undefined)
   const [activeId, setActiveId] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [query, setQuery] = useState('')
   const [search, setSearch] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
@@ -515,8 +516,8 @@ function App() {
   const userName = session.user.name ?? session.user.email
   const navigate = (id: string) => { setActiveId(id); setSidebarOpen(false) }
   const logout = async () => { await authApi.logout(); setSession(null) }
-  return <div className="app-shell">
-    <aside className={`sidebar ${sidebarOpen ? 'is-open' : ''}`}><div className="sidebar-top"><Brand /><button className="close-sidebar" onClick={() => setSidebarOpen(false)}><X /></button></div><button className="collapse-button"><ChevronLeft size={18} /></button><nav>{sections.map(({ id, label, icon: Icon }) => <button className={activeId === id ? 'active' : ''} key={id} onClick={() => navigate(id)}><Icon size={20} /><span>{label}</span></button>)}</nav><div className="sidebar-bottom"><button onClick={() => navigate('configuracoes')}><Settings size={20} /><span>Configurações</span></button><div className="user-mini"><div className="avatar">{initials(userName)}</div><div><strong>{userName}</strong><span>{session.user.role ?? 'Usuário'}</span></div></div></div></aside>
+  return <div className={`app-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+    <aside className={`sidebar ${sidebarOpen ? 'is-open' : ''}`}><div className="sidebar-top"><Brand /><button className="close-sidebar" onClick={() => setSidebarOpen(false)} aria-label="Fechar menu"><X /></button></div><button type="button" className="collapse-button" onClick={() => setSidebarCollapsed((value) => !value)} aria-label={sidebarCollapsed ? 'Expandir barra lateral' : 'Recolher barra lateral'} aria-expanded={!sidebarCollapsed} title={sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'}>{sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}</button><nav>{sections.map(({ id, label, icon: Icon }) => <button className={activeId === id ? 'active' : ''} key={id} onClick={() => navigate(id)} title={sidebarCollapsed ? label : undefined}><Icon size={20} /><span>{label}</span></button>)}</nav><div className="sidebar-bottom"><button onClick={() => navigate('configuracoes')} title={sidebarCollapsed ? 'Configurações' : undefined}><Settings size={20} /><span>Configurações</span></button><div className="user-mini" title={sidebarCollapsed ? userName : undefined}><div className="avatar">{initials(userName)}</div><div><strong>{userName}</strong><span>{session.user.role ?? 'Usuário'}</span></div></div></div></aside>
     {sidebarOpen && <button className="sidebar-scrim" onClick={() => setSidebarOpen(false)} />}
     <div className="workspace"><header className="topbar"><button className="menu-button" onClick={() => setSidebarOpen(true)}><Menu /></button><label className="search-box"><Search size={19} /><input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && activeId === 'dashboard') navigate('atendimentos') }} placeholder="Buscar no módulo atual…" />{query && <button onClick={() => setQuery('')}><X size={16} /></button>}</label><div className="top-actions"><TopbarNotifications refreshKey={refreshKey} onOpenAgenda={() => navigate('agenda')} /><button className="profile-button" onClick={() => navigate('configuracoes')}>{initials(userName)}</button></div></header>
       <main>{activeId === 'dashboard' ? <Dashboard refreshKey={refreshKey} onNavigate={navigate} /> : activeId === 'agenda' ? <CalendarPage refreshKey={refreshKey} /> : activeId === 'atendimentos' ? <AttendancesPage session={session} refreshKey={refreshKey} search={search} onNavigate={navigate} /> : activeId === 'oportunidades' ? <OpportunitiesPage search={search} refreshKey={refreshKey} onNavigate={navigate} /> : activeId === 'campanhas' ? <CampaignsPage session={session} /> : endpoints[activeId] ? <ResourcePage section={activeSection} search={search} refreshKey={refreshKey} /> : activeId === 'relatorios' ? <Reports refreshKey={refreshKey} /> : <SettingsPage session={session} onSessionChange={setSession} onLogout={logout} />}</main>
