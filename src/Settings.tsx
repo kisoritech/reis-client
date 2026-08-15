@@ -10,6 +10,7 @@ import {
   Mail,
   Palette,
   Pencil,
+  Phone,
   PlugZap,
   Save,
   ShieldCheck,
@@ -24,6 +25,13 @@ import {
 import type { LucideIcon } from "lucide-react";
 import type { PublicSession } from "../electron/contracts";
 import { apiRequest, mutationKey } from "./api";
+import {
+  firebaseConfigured,
+  listCallDevices,
+  registerThisPhone,
+  revokeCallDevice,
+  type CallDevice,
+} from "./callRelay";
 
 type SettingsTab =
   | "profile"
@@ -225,6 +233,8 @@ export default function Settings({
             <NotificationSettings
               value={preferences}
               onChange={updatePreferences}
+              session={session}
+              onMessage={setMessage}
             />
           )}
           {active === "security" && <SecuritySettings session={session} />}
@@ -1298,10 +1308,50 @@ function AppearanceSettings({
 function NotificationSettings({
   value,
   onChange,
+  session,
+  onMessage,
 }: {
   value: Preferences;
   onChange: (patch: Partial<Preferences>) => void;
+  session: PublicSession;
+  onMessage: (message: {
+    kind: "success" | "error" | "info";
+    text: string;
+  }) => void;
 }) {
+  const [devices, setDevices] = useState<CallDevice[]>([]);
+  const [linking, setLinking] = useState(false);
+  const loadDevices = useCallback(async () => {
+    try {
+      setDevices(await listCallDevices());
+    } catch {
+      setDevices([]);
+    }
+  }, []);
+  useEffect(() => {
+    void loadDevices();
+  }, [loadDevices, session.user.id]);
+  const linkPhone = async () => {
+    setLinking(true);
+    try {
+      await registerThisPhone();
+      await loadDevices();
+      onMessage({
+        kind: "success",
+        text: "Este aparelho receberá pedidos de ligação da sua conta.",
+      });
+    } catch (reason) {
+      onMessage({
+        kind: "error",
+        text:
+          reason instanceof Error
+            ? reason.message
+            : "Não foi possível vincular este aparelho.",
+      });
+    } finally {
+      setLinking(false);
+    }
+  };
   const options = [
     [
       "emailNotifications",
@@ -1338,6 +1388,55 @@ function NotificationSettings({
           />
         </div>
       ))}
+      <div className="settings-block call-device-settings">
+        <strong>Celular para ligações</strong>
+        <p className="settings-note">
+          Vincule este celular à conta {session.user.email}. No iPhone, abra o
+          REIS pela Tela de Início antes de permitir notificações.
+        </p>
+        <button
+          type="button"
+          className="gold-button"
+          disabled={
+            linking || Boolean(window.reisDesktop) || !firebaseConfigured()
+          }
+          onClick={() => void linkPhone()}
+        >
+          <Phone size={16} />{" "}
+          {linking ? "Vinculando..." : "Vincular este celular"}
+        </button>
+        {!firebaseConfigured() && (
+          <p className="settings-note">
+            Firebase ainda não configurado neste ambiente.
+          </p>
+        )}
+        <div className="call-device-list">
+          {devices
+            .filter((device) => device.active)
+            .map((device) => (
+              <div key={device.id}>
+                <span>
+                  <strong>{device.name}</strong>
+                  <small>
+                    {device.platform} · visto em{" "}
+                    {new Date(device.lastSeenAt).toLocaleString("pt-BR")}
+                  </small>
+                </span>
+                <button
+                  type="button"
+                  className="icon-button destructive"
+                  title="Desvincular"
+                  onClick={async () => {
+                    await revokeCallDevice(device.id);
+                    await loadDevices();
+                  }}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+        </div>
+      </div>
     </div>
   );
 }

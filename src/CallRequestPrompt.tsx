@@ -1,0 +1,76 @@
+import { useEffect, useState } from "react";
+import { Phone, X } from "lucide-react";
+import {
+  getCallRequest,
+  updateCallRequest,
+  type CallRequest,
+} from "./callRelay";
+
+export default function CallRequestPrompt() {
+  const [request, setRequest] = useState<CallRequest | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("callRequest");
+    if (!id) return;
+    void getCallRequest(id)
+      .then(async (value) => {
+        setRequest(value);
+        if (value.status === "requested") await updateCallRequest(id, "opened");
+      })
+      .catch((reason) =>
+        setError(
+          reason instanceof Error
+            ? reason.message
+            : "Não foi possível abrir a solicitação.",
+        ),
+      );
+  }, []);
+  if (!request && !error) return null;
+  const close = () => {
+    history.replaceState({}, "", window.location.pathname);
+    setRequest(null);
+    setError("");
+  };
+  const dial = async () => {
+    if (!request) return;
+    window.location.assign(request.dialUri);
+    await updateCallRequest(request.id, "dialer_opened").catch(() => undefined);
+    close();
+  };
+  const expired =
+    request &&
+    (request.status === "expired" || new Date(request.expiresAt) <= new Date());
+  return (
+    <div
+      className="dialog-backdrop call-request-backdrop"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="dialog call-request-dialog">
+        <button
+          className="icon-button call-request-close"
+          onClick={close}
+          aria-label="Fechar"
+        >
+          <X size={18} />
+        </button>
+        <Phone size={32} />
+        <h2>{error ? "Solicitação indisponível" : "Ligação recebida"}</h2>
+        <p>
+          {error ||
+            (expired
+              ? "Este pedido de ligação expirou."
+              : `Confirmar ligação para ${request?.targetName}?`)}
+        </p>
+        {request && !expired && (
+          <>
+            <strong>{request.phone}</strong>
+            <button className="gold-button" onClick={() => void dial()}>
+              <Phone size={17} /> Ligar agora
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

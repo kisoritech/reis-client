@@ -396,6 +396,8 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
 .client-profile { display: flex; align-items: center; gap: 14px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
 .client-profile > i { width: 54px; height: 54px; flex: 0 0 auto; }
 .client-profile > div { min-width: 0; display: grid; gap: 3px; }
+.client-profile > .client-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.whatsapp-action { color: #25d366; border-color: color-mix(in srgb, #25d366 45%, var(--border)); }
 .client-profile h2 { margin: 0; font-family: var(--display-font); font-size: 25px; }
 .client-profile span, .client-contact-row { color: var(--muted); font-size: 13px; }
 .client-contact-row { min-height: 42px; padding: 12px 0; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; }

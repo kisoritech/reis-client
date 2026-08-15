@@ -11,3 +11,14 @@
 html { background: #0a0a0a; }
 body { margin: 0; min-width: 320px; min-height: 100vh; }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid #c9a40a; outline-offset: 2px; }
+.call-device-settings .gold-button { width: fit-content; }
+.call-device-list { display: grid; gap: 8px; margin-top: 14px; }
+.call-device-list > div { align-items: center; border: 1px solid var(--border); border-radius: 10px; display: flex; justify-content: space-between; padding: 10px 12px; }
+.call-device-list span { display: grid; gap: 3px; }
+.call-device-list small { color: var(--muted); }
+.call-request-backdrop { z-index: 1000; }
+.call-request-dialog { align-items: center; display: flex; flex-direction: column; gap: 14px; max-width: 390px; padding: 34px; position: relative; text-align: center; }
+.call-request-dialog > svg { color: var(--gold); }
+.call-request-dialog > strong { font-size: 1.15rem; }
+.call-request-dialog .gold-button { justify-content: center; width: 100%; }
+.call-request-close { position: absolute; right: 12px; top: 12px; }

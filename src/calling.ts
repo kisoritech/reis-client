@@ -38,7 +38,20 @@ export async function callContact(target: CallTarget): Promise<CallAttempt> {
   return result.data;
 }
 
+export async function openWhatsAppConversation(phone: string): Promise<void> {
+  const url = `https://wa.me/${normalizePhoneDigits(phone)}`;
+  if (window.reisDesktop) {
+    await window.reisDesktop.system.openExternal(url);
+  } else {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+}
+
 function localDialUri(value: string) {
+  return `tel:+${normalizePhoneDigits(value)}`;
+}
+
+function normalizePhoneDigits(value: string) {
   const raw = value.trim();
   const digits = raw.replace(/\D/g, "");
   const normalized = raw.startsWith("+")
@@ -53,5 +66,5 @@ function localDialUri(value: string) {
   ) {
     throw new Error("Telefone inválido para discagem");
   }
-  return `tel:+${normalized}`;
+  return normalized;
 }

@@ -23,6 +23,9 @@ describe("desktop security boundaries", () => {
       false,
     );
     expect(isAllowedExternalUrl("https://evil.example/", hosts)).toBe(false);
+    expect(
+      isAllowedExternalUrl("https://wa.me/5565999999999", new Set(["wa.me"])),
+    ).toBe(true);
     expect(isAllowedExternalUrl("tel:+5565999999999", hosts)).toBe(true);
     expect(isAllowedExternalUrl("tel:9999;evil", hosts)).toBe(false);
   });

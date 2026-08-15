@@ -42,7 +42,7 @@ protocol.registerSchemesAsPrivileged([
 const externalHosts = new Set(
   (
     process.env.REIS_ALLOWED_EXTERNAL_HOSTS ??
-    "localhost,app.seudominio.com,api-reis.onrender.com,accounts.google.com"
+    "localhost,app.seudominio.com,api-reis.onrender.com,accounts.google.com,wa.me"
   )
     .split(",")
     .map((host) => host.trim())
