@@ -4,7 +4,6 @@ import {
   Mail,
   MessageCircle,
   Phone,
-  Smartphone,
   RefreshCw,
   Search,
   UserRound,
@@ -12,7 +11,6 @@ import {
 } from "lucide-react";
 import { apiRequest } from "./api";
 import { callContact, openWhatsAppConversation } from "./calling";
-import { sendCallToPhone } from "./callRelay";
 
 type Account = Record<string, unknown> & {
   id?: string;
@@ -88,7 +86,6 @@ export default function ClientsPage({
   const [error, setError] = useState("");
   const [version, setVersion] = useState(0);
   const [calling, setCalling] = useState(false);
-  const [sendingCall, setSendingCall] = useState(false);
 
   useEffect(() => {
     let current = true;
@@ -211,31 +208,6 @@ export default function ClientsPage({
     }
   };
 
-  const sendSelectedCallToPhone = async () => {
-    if (!selected?.phone || !selected.accountId) return;
-    setSendingCall(true);
-    setError("");
-    try {
-      const request = await sendCallToPhone({
-        phone: selected.phone,
-        targetName: selected.name,
-        accountId: selected.accountId,
-      });
-      if (["unavailable", "push_failed"].includes(request.delivery ?? ""))
-        throw new Error(
-          "Nenhum celular recebeu o pedido. Vincule o aparelho em Configurações > Notificações.",
-        );
-    } catch (reason) {
-      setError(
-        reason instanceof Error
-          ? reason.message
-          : "Não foi possível enviar a ligação ao celular.",
-      );
-    } finally {
-      setSendingCall(false);
-    }
-  };
-
   return (
     <section className="clients-page">
       <div className="page-heading">
@@ -354,17 +326,6 @@ export default function ClientsPage({
                       >
                         <MessageCircle size={16} /> WhatsApp
                       </button>
-                      {selected.accountId && (
-                        <button
-                          type="button"
-                          className="outline-button"
-                          disabled={sendingCall}
-                          onClick={() => void sendSelectedCallToPhone()}
-                        >
-                          <Smartphone size={16} />{" "}
-                          {sendingCall ? "Enviando..." : "Enviar ao celular"}
-                        </button>
-                      )}
                       {selected.accountId && (
                         <button
                           type="button"
