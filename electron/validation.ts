@@ -36,13 +36,24 @@ export const apiRequestSchema = z
   .refine(
     ({ path }) =>
       !path.includes("..") && !path.includes("://") && isAllowedApiPath(path),
-    "Endpoint não permitido",
+    "Endpoint nao permitido",
   )
   .refine(
     ({ method, idempotencyKey }) =>
       method === "GET" || method === "DELETE" || Boolean(idempotencyKey),
-    "Mutações exigem chave de idempotência",
+    "Mutacoes exigem chave de idempotencia",
   );
+
+export const apiUploadSchema = z.object({
+  path: z.string().regex(/^\/crm\/atendimentos\/[0-9a-f-]{36}\/foto\/upload$/i),
+  bytes: z
+    .instanceof(Uint8Array)
+    .refine(
+      (value) => value.byteLength > 0 && value.byteLength <= 8 * 1024 * 1024,
+    ),
+  fileName: z.string().min(1).max(255),
+  mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+});
 
 const deepLinkRoutes = [
   /^\/atendimentos\/[0-9a-f-]{36}$/i,
@@ -70,9 +81,7 @@ export function isAllowedExternalUrl(
 ): boolean {
   try {
     const url = new URL(value);
-    if (url.protocol === "tel:") {
-      return /^\+[1-9]\d{7,14}$/.test(url.pathname);
-    }
+    if (url.protocol === "tel:") return /^\+[1-9]\d{7,14}$/.test(url.pathname);
     return url.protocol === "https:" && hosts.has(url.hostname);
   } catch {
     return false;

@@ -10,7 +10,7 @@ import {
   Search,
 } from "lucide-react";
 import type { PublicSession } from "../electron/contracts";
-import { apiRequest, mutationKey, ReisApiError } from "./api";
+import { apiRequest, apiUploadFile, mutationKey, ReisApiError } from "./api";
 import LeadsPage from "./Leads";
 import OperationalFlow from "./OperationalFlow";
 
@@ -251,7 +251,13 @@ export default function AttendancesPage({
     return () => {
       current = false;
     };
-  }, [refreshKey, session.user.companyId, session.user.id, sessionUser, version]);
+  }, [
+    refreshKey,
+    session.user.companyId,
+    session.user.id,
+    sessionUser,
+    version,
+  ]);
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -616,6 +622,7 @@ function AttendanceForm({
   });
   const [photo, setPhoto] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [createdAttendanceId, setCreatedAttendanceId] = useState("");
   const [error, setError] = useState("");
   const set = (key: string, value: string | boolean) =>
     setValues((current) => ({ ...current, [key]: value }));
@@ -680,17 +687,32 @@ function AttendanceForm({
         googleSyncEnabled: Boolean(values.googleSync),
       };
     }
+    let attendanceSaved = Boolean(createdAttendanceId);
     try {
-      await apiRequest({
-        method: "POST",
-        path: "/crm/atendimentos",
-        body,
-        idempotencyKey: mutationKey(),
-      });
+      let attendanceId = createdAttendanceId;
+      if (!attendanceId) {
+        const created = await apiRequest<{ atendimento: { id: string } }>({
+          method: "POST",
+          path: "/crm/atendimentos",
+          body,
+          idempotencyKey: mutationKey(),
+        });
+        attendanceId = created.data.atendimento.id;
+        setCreatedAttendanceId(attendanceId);
+        attendanceSaved = true;
+      }
+      if (photo) {
+        await apiUploadFile(
+          `/crm/atendimentos/${attendanceId}/foto/upload`,
+          photo,
+        );
+      }
       onCreated();
     } catch (reason) {
       setError(
-        apiErrorMessage(reason, "Não foi possível registrar o atendimento"),
+        attendanceSaved
+          ? `O atendimento foi salvo, mas a imagem não foi enviada. ${apiErrorMessage(reason, "Tente enviar novamente.")}`
+          : apiErrorMessage(reason, "Não foi possível registrar o atendimento"),
       );
       setSaving(false);
     }
@@ -865,8 +887,8 @@ function AttendanceForm({
                   {photo ? photo.name : "Selecionar foto para pré-visualização"}
                 </i>
                 <small>
-                  A API ainda não possui upload específico para atendimento; o
-                  arquivo não será enviado até esse endpoint estar disponível.
+                  JPEG, PNG ou WebP, com tamanho máximo de 8 MB. A imagem será
+                  enviada ao salvar o atendimento.
                 </small>
               </label>
               <label className="attendance-check full-field">

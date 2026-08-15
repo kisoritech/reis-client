@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
-import { Download, Filter, Phone, Plus, RefreshCw, X } from "lucide-react";
+import { Download, Filter, Plus, RefreshCw, X } from "lucide-react";
 import { apiRequest, mutationKey } from "./api";
-import { callContact } from "./calling";
 
 type LeadRow = Record<string, unknown> & {
   id?: string;
@@ -526,29 +525,6 @@ function LeadDetails({
       setWorking(false);
     }
   };
-  const phone = lead.cliente?.telefone ?? lead.telefone ?? lead.phone;
-  const dial = async () => {
-    if (!phone || !lead.id || !lead.cliente?.id) return;
-    setWorking(true);
-    setError("");
-    try {
-      await callContact({
-        phone,
-        targetName: leadName(lead),
-        accountId: lead.cliente.id,
-        leadId: lead.id,
-        source: "leads",
-      });
-    } catch (failure) {
-      setError(
-        failure instanceof Error
-          ? failure.message
-          : "Não foi possível abrir o discador",
-      );
-    } finally {
-      setWorking(false);
-    }
-  };
   return (
     <div
       className="dialog-backdrop"
@@ -691,16 +667,6 @@ function LeadDetails({
         </div>
         {error && <div className="form-error">{error}</div>}
         <div className="dialog-actions">
-          {phone && lead.cliente?.id && (
-            <button
-              type="button"
-              className="gold-button"
-              disabled={working}
-              onClick={() => void dial()}
-            >
-              <Phone size={16} /> Ligar
-            </button>
-          )}
           <button type="button" className="outline-button" onClick={onClose}>
             Fechar
           </button>

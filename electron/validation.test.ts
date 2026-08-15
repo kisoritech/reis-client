@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   apiRequestSchema,
+  apiUploadSchema,
   isAllowedExternalUrl,
   parseDeepLink,
 } from "./validation";
@@ -44,6 +45,25 @@ describe("desktop security boundaries", () => {
     expect(
       apiRequestSchema.safeParse({ method: "GET", path: "/health-malicious" })
         .success,
+    ).toBe(false);
+  });
+
+  it("accepts only bounded attendance image uploads", () => {
+    expect(
+      apiUploadSchema.safeParse({
+        path: "/crm/atendimentos/123e4567-e89b-12d3-a456-426614174000/foto/upload",
+        bytes: new Uint8Array([1, 2, 3]),
+        fileName: "foto.jpg",
+        mimeType: "image/jpeg",
+      }).success,
+    ).toBe(true);
+    expect(
+      apiUploadSchema.safeParse({
+        path: "/crm/atendimentos/123e4567-e89b-12d3-a456-426614174000/foto/upload",
+        bytes: new Uint8Array([1]),
+        fileName: "script.svg",
+        mimeType: "image/svg+xml",
+      }).success,
     ).toBe(false);
   });
 });
