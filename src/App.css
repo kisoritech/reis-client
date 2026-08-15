@@ -518,6 +518,8 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
 .settings-form input:disabled { opacity: 1; color: var(--muted); background: var(--input-disabled); cursor: not-allowed; }
 .settings-form .gold-button { width: max-content; min-width: 165px; justify-content: center; }
 .settings-form .profile-save-button { width: 180px; min-width: 180px; max-width: 180px; height: 42px; padding: 0 16px; align-self: start; }
+.settings-form .cic-add-button { width: 132px; min-width: 132px; min-height: 38px; height: 38px; padding: 0 13px; align-self: end; font-size: 13px; }
+.settings-form.cics-form { margin-bottom: 14px; }
 .settings-block { margin-bottom: 20px; padding: 20px; border: 1px solid var(--border); border-radius: 18px; }
 .settings-block.row { min-height: 86px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .settings-block > strong, .settings-block.row strong { display: block; margin-bottom: 5px; font-size: 17px; }
