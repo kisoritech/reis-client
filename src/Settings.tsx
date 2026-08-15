@@ -1500,6 +1500,14 @@ function IntegrationSettings({
   );
   const [loading, setLoading] = useState(true);
   const [connectingGoogle, setConnectingGoogle] = useState(false);
+  const [googleImportMode, setGoogleImportMode] = useState("recommended");
+  const [googleImportStart, setGoogleImportStart] = useState("");
+  const [googleImportEnd, setGoogleImportEnd] = useState("");
+  const [googleSyncing, setGoogleSyncing] = useState(false);
+  const [googleImportResult, setGoogleImportResult] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
   const [googleVerificationError, setGoogleVerificationError] = useState("");
   const connectionAttempt = useRef(0);
   const verifyGoogle = useCallback(async () => {
@@ -1631,6 +1639,58 @@ function IntegrationSettings({
       });
     }
   };
+  const runGoogleCalendarAction = async (kind: "import" | "sync") => {
+    if (
+      kind === "import" &&
+      googleImportMode === "custom" &&
+      (!googleImportStart || !googleImportEnd)
+    ) {
+      onMessage({
+        kind: "error",
+        text: "Informe as datas inicial e final para importar o período personalizado.",
+      });
+      return;
+    }
+    setGoogleSyncing(true);
+    try {
+      const result = await apiRequest<Record<string, unknown>>({
+        method: "POST",
+        path: `/integrations/google/calendar/${kind}`,
+        body:
+          kind === "import"
+            ? {
+                mode: googleImportMode,
+                ...(googleImportMode === "custom"
+                  ? {
+                      timeMin: new Date(`${googleImportStart}T00:00:00`).toISOString(),
+                      timeMax: new Date(`${googleImportEnd}T23:59:59.999`).toISOString(),
+                    }
+                  : {}),
+              }
+            : {},
+        idempotencyKey: mutationKey(),
+      });
+      setGoogleImportResult(result.data);
+      await load();
+      onMessage({
+        kind: "success",
+        text:
+          kind === "import"
+            ? "Eventos do Google Agenda importados com sucesso."
+            : "Google Agenda sincronizado com sucesso.",
+      });
+    } catch (error) {
+      onMessage({
+        kind: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Não foi possível sincronizar o Google Agenda.",
+      });
+    } finally {
+      setGoogleSyncing(false);
+    }
+  };
   const googleConnected = google?.status === "active";
   const googleVerified =
     googleConnected && !googleVerificationError && google?.status === "active";
@@ -1687,8 +1747,9 @@ function IntegrationSettings({
       {loading ? (
         <div className="settings-loading">Consultando integrações na API…</div>
       ) : (
-        <div className="integration-grid">
-          {items.map((item) => (
+        <>
+          <div className="integration-grid">
+            {items.map((item) => (
             <article className="integration-card" key={item.name}>
               <div className="integration-logo">
                 <PlugZap size={20} />
@@ -1714,8 +1775,95 @@ function IntegrationSettings({
                     : "Indisponível")}
               </button>
             </article>
-          ))}
-        </div>
+            ))}
+          </div>
+          {googleVerified && (
+            <section className="google-calendar-import">
+              <div className="google-calendar-import-heading">
+                <div>
+                  <h3>Importar agenda existente</h3>
+                  <p>
+                    Traga eventos já cadastrados no Google e mantenha as próximas
+                    alterações sincronizadas automaticamente.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="outline-button"
+                  disabled={googleSyncing || !google?.lastImportedAt}
+                  onClick={() => void runGoogleCalendarAction("sync")}
+                >
+                  {googleSyncing ? "Sincronizando…" : "Sincronizar agora"}
+                </button>
+              </div>
+              <div className="google-calendar-import-fields">
+                <label>
+                  Período
+                  <select
+                    value={googleImportMode}
+                    disabled={googleSyncing}
+                    onChange={(event) => setGoogleImportMode(event.target.value)}
+                  >
+                    <option value="recommended">1 ano atrás e 2 à frente</option>
+                    <option value="future">Somente eventos futuros</option>
+                    <option value="custom">Período personalizado</option>
+                    <option value="all">Todo o histórico</option>
+                  </select>
+                </label>
+                {googleImportMode === "custom" && (
+                  <>
+                    <label>
+                      Data inicial
+                      <input
+                        type="date"
+                        value={googleImportStart}
+                        disabled={googleSyncing}
+                        onChange={(event) => setGoogleImportStart(event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Data final
+                      <input
+                        type="date"
+                        value={googleImportEnd}
+                        disabled={googleSyncing}
+                        onChange={(event) => setGoogleImportEnd(event.target.value)}
+                      />
+                    </label>
+                  </>
+                )}
+                <button
+                  type="button"
+                  className="gold-button"
+                  disabled={googleSyncing}
+                  onClick={() => void runGoogleCalendarAction("import")}
+                >
+                  {googleSyncing ? "Importando…" : "Importar eventos"}
+                </button>
+              </div>
+              <div className="google-calendar-sync-status">
+                <span>Eventos vinculados: {Number(google?.importedEvents ?? 0)}</span>
+                {Boolean(google?.lastSyncAt) && (
+                  <span>
+                    Última sincronização: {new Date(String(google.lastSyncAt)).toLocaleString("pt-BR")}
+                  </span>
+                )}
+                {google?.lastSyncStatus === "error" && (
+                  <span className="error">Falha: {String(google.lastSyncError || "erro desconhecido")}</span>
+                )}
+              </div>
+              {googleImportResult && (
+                <div className="google-calendar-import-result" role="status">
+                  <strong>Resultado</strong>
+                  <span>{Number(googleImportResult.created ?? 0)} criados</span>
+                  <span>{Number(googleImportResult.updated ?? 0)} atualizados</span>
+                  <span>{Number(googleImportResult.canceled ?? 0)} cancelados</span>
+                  <span>{Number(googleImportResult.ignored ?? 0)} ignorados</span>
+                </div>
+              )}
+            </section>
+          )}
+        </>
       )}
     </div>
   );

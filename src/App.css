@@ -550,6 +550,16 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
 .integration-card > div:nth-child(2) { min-width: 0; display: grid; gap: 2px; }
 .integration-card span, .integration-card small { overflow: hidden; color: var(--muted); font-size: 13px; text-overflow: ellipsis; }
 .integration-card span.connected { color: var(--success); }
+.google-calendar-import { margin-top: 18px; padding: 20px; display: grid; gap: 18px; border: 1px solid var(--border); border-radius: 18px; background: var(--surface); }
+.google-calendar-import-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.google-calendar-import-heading h3, .google-calendar-import-heading p { margin: 0; }
+.google-calendar-import-heading p { margin-top: 5px; color: var(--muted); font-size: 14px; }
+.google-calendar-import-fields { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; }
+.google-calendar-import-fields label { min-width: 190px; display: grid; gap: 7px; color: var(--muted); font-size: 13px; }
+.google-calendar-import-fields select, .google-calendar-import-fields input { min-height: 40px; padding: 0 11px; border: 1px solid var(--border); border-radius: 10px; color: var(--text); background: var(--input-bg); }
+.google-calendar-sync-status, .google-calendar-import-result { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--muted); font-size: 13px; }
+.google-calendar-sync-status .error { color: var(--danger-text); }
+.google-calendar-import-result { padding: 12px 14px; border-radius: 10px; color: var(--text); background: var(--gold-dark); }
 .settings-loading { min-height: 220px; display: grid; place-items: center; color: var(--muted); }
 .users-table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 14px; }
 .users-table { width: 100%; min-width: 760px; border-collapse: collapse; }
@@ -669,7 +679,18 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
 .calendar-toolbar { min-height: 68px; padding: 11px 15px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 14px; border-bottom: 1px solid var(--border); }
 .calendar-period, .calendar-controls, .calendar-view-toggle { display: flex; align-items: center; gap: 8px; }
 .calendar-period > button, .calendar-view-toggle button { min-height: 36px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 9px; color: var(--muted); background: transparent; cursor: pointer; }
-.calendar-period .today-button { padding-inline: 14px; color: var(--text); }
+.calendar-period .today-button { min-height: 38px; padding: 7px 17px; border: 1px solid color-mix(in srgb, var(--gold) 72%, white); border-radius: 10px; color: var(--on-gold); background: linear-gradient(135deg, var(--gold-bright), var(--gold)); box-shadow: 0 6px 18px color-mix(in srgb, var(--gold) 24%, transparent); font-weight: 800; letter-spacing: .01em; cursor: pointer; transition: transform .16s ease, box-shadow .16s ease; }
+.calendar-period .today-button:hover { transform: translateY(-1px); box-shadow: 0 9px 22px color-mix(in srgb, var(--gold) 34%, transparent); }
+.calendar-period .today-button[aria-expanded="true"] { box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 22%, transparent); }
+.calendar-period-picker { position: relative; }
+.calendar-period-menu { position: absolute; z-index: 20; top: calc(100% + 8px); left: 0; width: min(390px, calc(100vw - 32px)); padding: 16px; display: grid; gap: 13px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 18px 48px rgba(0, 0, 0, .35); }
+.calendar-period-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.calendar-period-options button, .calendar-period-actions > button { min-height: 34px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); background: transparent; cursor: pointer; }
+.calendar-period-options button.active { border-color: var(--gold); color: var(--on-gold); background: var(--gold); }
+.calendar-period-menu label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
+.calendar-period-menu input, .calendar-period-menu select { width: 100%; height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: 9px; color: var(--text); background: var(--input-bg); }
+.calendar-period-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.calendar-period-actions .gold-button { color: var(--on-gold); background: var(--gold); }
 .calendar-period h2 { margin-left: 10px; text-transform: capitalize; }
 .calendar-controls select, .calendar-dialog select { height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: 9px; color: var(--text); background: var(--input-bg); }
 .calendar-view-toggle { padding: 3px; border: 1px solid var(--border); border-radius: 11px; }
@@ -679,6 +700,20 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
 .calendar-weekdays span { padding: 10px; color: var(--muted); font-size: 12px; text-align: center; text-transform: uppercase; }
 .calendar-grid { height: calc(100% - 33px); display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: repeat(6, minmax(0, 1fr)); }
 .calendar-grid-wrap { min-height: 0; height: auto; }
+.calendar-year-grid { min-height: 0; padding: 16px; overflow-y: auto; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.calendar-year-grid > button { min-height: 128px; padding: 16px; display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto 1fr; gap: 5px 10px; border: 1px solid var(--border); border-radius: 13px; color: var(--text); background: linear-gradient(145deg, var(--surface-soft), var(--surface)); cursor: pointer; text-align: left; transition: border-color .16s ease, transform .16s ease, background .16s ease; }
+.calendar-year-grid > button:hover { transform: translateY(-2px); border-color: var(--gold); background: var(--gold-dark); }
+.calendar-year-grid span { text-transform: capitalize; font-weight: 750; }
+.calendar-year-grid strong { grid-row: 1 / 3; grid-column: 2; color: var(--gold-bright); font-size: 24px; }
+.calendar-year-grid small { color: var(--muted); }
+.calendar-year-grid > button > div { grid-column: 1 / -1; align-self: end; display: flex; gap: 5px; }
+.calendar-year-grid i { width: 7px; height: 7px; border-radius: 50%; background: var(--gold); }
+.calendar-year-grid i.event-realizado { background: var(--success); }
+.calendar-year-grid i.event-cancelado, .calendar-year-grid i.event-nao_compareceu { background: #ef493c; }
+.calendar-year-grid i.event-confirmado { background: #65a7ff; }
+@media (max-width: 1100px) { .calendar-year-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .calendar-year-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 10px; gap: 8px; } .calendar-year-grid > button { min-height: 108px; padding: 12px; } .calendar-period-menu { left: -44px; } }
+@media (max-width: 430px) { .calendar-year-grid { grid-template-columns: 1fr; } }
 .calendar-day { min-width: 0; min-height: 0; padding: 7px; overflow: hidden; border: 0; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); color: var(--text); background: transparent; cursor: pointer; text-align: left; }
 .calendar-day:nth-child(7n) { border-right: 0; }
 .calendar-day.outside { opacity: .35; }
@@ -981,6 +1016,8 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
   .settings-block.row { align-items: flex-start; }
   .integration-card { grid-template-columns: auto minmax(0, 1fr); }
   .integration-card .outline-button { grid-column: 1 / -1; }
+  .google-calendar-import-heading { flex-direction: column; }
+  .google-calendar-import-heading .outline-button, .google-calendar-import-fields label, .google-calendar-import-fields .gold-button { width: 100%; }
   .lead-toolbar { align-items: flex-start; flex-direction: column; }
   .lead-actions { width: 100%; }
   .dialog-fields { grid-template-columns: 1fr; }

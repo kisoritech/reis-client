@@ -1413,24 +1413,20 @@ function Reports({ refreshKey }: { refreshKey: number }) {
     const now = new Date();
     const start = new Date(now.getFullYear(), 0, 1).toISOString();
     const end = new Date(now.getFullYear() + 1, 0, 1).toISOString();
-    const [attendanceResult, scheduleResult, centralResult] = await Promise.all(
-      [
-        apiRequest<AttendancePayload>({
-          method: "GET",
-          path: "/crm/atendimentos?limit=100",
-        }),
-        apiRequest<DayEvent[]>({
-          method: "GET",
-          path: `/calendar/events?${new URLSearchParams({ start, end })}`,
-        }),
-        apiRequest<Central>({ method: "GET", path: "/crm/central" }),
-      ],
-    );
+    const [attendanceResult, scheduleResult] = await Promise.all([
+      apiRequest<AttendancePayload>({
+        method: "GET",
+        path: "/crm/atendimentos?limit=100",
+      }),
+      apiRequest<DayEvent[]>({
+        method: "GET",
+        path: `/calendar/events?${new URLSearchParams({ start, end })}`,
+      }),
+    ]);
     const payload = attendanceResult.data;
     return {
       attendances: Array.isArray(payload) ? payload : payload.items,
       schedules: scheduleResult.data,
-      central: centralResult.data,
     };
   }, [refreshKey]);
   const [exporting, setExporting] = useState<"excel" | "pdf" | null>(null);
@@ -1444,7 +1440,7 @@ function Reports({ refreshKey }: { refreshKey: number }) {
       />
     );
 
-  const { attendances, schedules, central } = remote.data;
+  const { attendances, schedules } = remote.data;
   const field = (item: DashboardAttendance, ...keys: string[]) =>
     keys
       .map((key) => item[key])
@@ -1544,41 +1540,11 @@ function Reports({ refreshKey }: { refreshKey: number }) {
     try {
       const XLSX = await import("xlsx");
       const book = XLSX.utils.book_new();
-      const summary = [
-        { Indicador: "Total de atendimentos", Resultado: attendances.length },
-        { Indicador: "Concluídos", Resultado: completed.length },
-        { Indicador: "Em andamento", Resultado: open },
-        { Indicador: "Cancelados / perdidos", Resultado: lost.length },
-        { Indicador: "Taxa de conversão", Resultado: `${conversion}%` },
-        { Indicador: "Valor negociado", Resultado: totalValue },
-        { Indicador: "Agendamentos no ano", Resultado: schedules.length },
-        { Indicador: "Negócios ganhos", Resultado: central.metrics.wonDeals },
-      ];
-      const summarySheet = XLSX.utils.json_to_sheet(summary);
-      summarySheet["!cols"] = [{ wch: 30 }, { wch: 22 }];
       const detailSheet = XLSX.utils.json_to_sheet(rows);
       detailSheet["!cols"] = [12, 28, 24, 24, 28, 20, 18, 16, 48].map(
         (wch) => ({ wch }),
       );
-      const monthSheet = XLSX.utils.json_to_sheet(
-        monthRows.map((item) => ({
-          Mês: item.month,
-          Atendimentos: item.count,
-          Concluídos: item.completed,
-          "Valor negociado": item.value,
-        })),
-      );
-      const statusSheet = XLSX.utils.json_to_sheet(
-        statusCounts.map(([status, count]) => ({
-          Status: status,
-          Atendimentos: count,
-          Participação: `${attendances.length ? Math.round((count / attendances.length) * 100) : 0}%`,
-        })),
-      );
-      XLSX.utils.book_append_sheet(book, summarySheet, "Resumo executivo");
       XLSX.utils.book_append_sheet(book, detailSheet, "Atendimentos");
-      XLSX.utils.book_append_sheet(book, monthSheet, "Evolução mensal");
-      XLSX.utils.book_append_sheet(book, statusSheet, "Status");
       XLSX.writeFile(book, `relatorio-atendimentos-reis-${stamp}.xlsx`, {
         compression: true,
       });
@@ -1740,7 +1706,7 @@ function Reports({ refreshKey }: { refreshKey: number }) {
             onClick={() => void exportExcel()}
           >
             <FileSpreadsheet size={17} />
-            {exporting === "excel" ? "Gerando…" : "Excel detalhado"}
+            {exporting === "excel" ? "Gerando…" : "Excel de atendimentos"}
           </button>
           <button
             className="gold-button"
