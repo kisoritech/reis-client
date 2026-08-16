@@ -372,6 +372,10 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
 .module-card h2 { margin: 0 0 7px; }
 .module-card p { margin: 0; color: var(--muted); }
 .clients-workspace { display: grid; grid-template-columns: minmax(280px, .75fr) minmax(0, 1.65fr); gap: 18px; }
+.call-feedback { margin-bottom: 14px; padding: 11px 13px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid; border-radius: 10px; font-size: 14px; }
+.call-feedback.success { color: var(--success); border-color: rgba(0,232,121,.28); background: rgba(0,232,121,.07); }
+.call-feedback.error { color: var(--danger-text); border-color: var(--danger-border); background: var(--danger-bg); }
+.call-feedback button { padding: 2px; display: grid; place-items: center; border: 0; color: inherit; background: transparent; cursor: pointer; }
 .clients-list-panel, .client-history-panel { min-height: 520px; }
 .clients-list-panel { padding: 0; overflow: hidden; }
 .clients-list-panel > .panel-heading { min-height: 72px; padding: 16px 18px; border-bottom: 1px solid var(--border); }

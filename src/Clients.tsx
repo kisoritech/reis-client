@@ -6,11 +6,13 @@ import {
   Phone,
   RefreshCw,
   Search,
+  Smartphone,
   UserRound,
   X,
 } from "lucide-react";
 import { apiRequest } from "./api";
 import { callContact, openWhatsAppConversation } from "./calling";
+import { sendCallToPhone } from "./callRelay";
 
 type Account = Record<string, unknown> & {
   id?: string;
@@ -84,6 +86,10 @@ export default function ClientsPage({
   const [searchOpen, setSearchOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [callFeedback, setCallFeedback] = useState<{
+    kind: "success" | "error";
+    message: string;
+  } | null>(null);
   const [version, setVersion] = useState(0);
   const [calling, setCalling] = useState(false);
 
@@ -175,20 +181,39 @@ export default function ClientsPage({
   const dialSelected = async () => {
     if (!selected?.phone || !selected.accountId) return;
     setCalling(true);
-    setError("");
+    setCallFeedback(null);
     try {
-      await callContact({
-        phone: selected.phone,
-        targetName: selected.name,
-        accountId: selected.accountId,
-        source: "clients",
-      });
+      if (isMobileBrowser()) {
+        await callContact({
+          phone: selected.phone,
+          targetName: selected.name,
+          accountId: selected.accountId,
+          source: "clients",
+        });
+      } else {
+        const request = await sendCallToPhone({
+          phone: selected.phone,
+          targetName: selected.name,
+          accountId: selected.accountId,
+        });
+        setCallFeedback(
+          request.delivery === "push"
+            ? { kind: "success", message: "Pedido enviado ao celular vinculado." }
+            : request.delivery === "email"
+              ? { kind: "success", message: "O link para ligação foi enviado por e-mail." }
+              : {
+                  kind: "error",
+                  message: "Nenhum celular vinculado recebeu o pedido. Vincule o aparelho em Configurações > Notificações.",
+                },
+        );
+      }
     } catch (reason) {
-      setError(
-        reason instanceof Error
+      setCallFeedback({
+        kind: "error",
+        message: reason instanceof Error
           ? reason.message
           : "NÃ£o foi possÃ­vel abrir o discador.",
-      );
+      });
     } finally {
       setCalling(false);
     }
@@ -241,7 +266,16 @@ export default function ClientsPage({
         </div>
       )}
       {!loading && !error && (
-        <div className="clients-workspace">
+        <>
+          {callFeedback && (
+            <div className={`call-feedback ${callFeedback.kind}`} role="status">
+              <span>{callFeedback.message}</span>
+              <button type="button" aria-label="Fechar aviso" onClick={() => setCallFeedback(null)}>
+                <X size={15} />
+              </button>
+            </div>
+          )}
+          <div className="clients-workspace">
           <article className="panel clients-list-panel">
             <div className="panel-heading">
               <div>
@@ -333,8 +367,12 @@ export default function ClientsPage({
                           disabled={calling}
                           onClick={() => void dialSelected()}
                         >
-                          <Phone size={16} />
-                          {calling ? "Abrindo..." : "Ligar"}
+                          {isMobileBrowser() ? <Phone size={16} /> : <Smartphone size={16} />}
+                          {calling
+                            ? "Enviando..."
+                            : isMobileBrowser()
+                              ? "Ligar"
+                              : "Enviar ao celular"}
                         </button>
                       )}
                     </div>
@@ -409,8 +447,13 @@ export default function ClientsPage({
               </div>
             )}
           </article>
-        </div>
+          </div>
+        </>
       )}
     </section>
   );
+}
+
+function isMobileBrowser() {
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }

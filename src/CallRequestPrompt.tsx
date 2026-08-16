@@ -26,16 +26,25 @@ export default function CallRequestPrompt() {
       );
   }, []);
   if (!request && !error) return null;
-  const close = () => {
+  const close = (registerCancellation = true) => {
+    if (
+      registerCancellation &&
+      request &&
+      request.status !== "expired" &&
+      request.status !== "dialer_opened"
+    ) {
+      void updateCallRequest(request.id, "canceled").catch(() => undefined);
+    }
     history.replaceState({}, "", window.location.pathname);
     setRequest(null);
     setError("");
   };
   const dial = async () => {
     if (!request) return;
-    window.location.assign(request.dialUri);
     await updateCallRequest(request.id, "dialer_opened").catch(() => undefined);
-    close();
+    const dialUri = request.dialUri;
+    close(false);
+    window.location.assign(dialUri);
   };
   const expired =
     request &&
@@ -49,7 +58,7 @@ export default function CallRequestPrompt() {
       <div className="dialog call-request-dialog">
         <button
           className="icon-button call-request-close"
-          onClick={close}
+          onClick={() => close()}
           aria-label="Fechar"
         >
           <X size={18} />
