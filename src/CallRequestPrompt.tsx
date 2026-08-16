@@ -31,7 +31,8 @@ export default function CallRequestPrompt() {
       registerCancellation &&
       request &&
       request.status !== "expired" &&
-      request.status !== "dialer_opened"
+      request.status !== "dialer_opened" &&
+      new Date(request.expiresAt) > new Date()
     ) {
       void updateCallRequest(request.id, "canceled").catch(() => undefined);
     }
