@@ -10,7 +10,13 @@ import {
   Search,
 } from "lucide-react";
 import type { PublicSession } from "../electron/contracts";
-import { apiRequest, apiUploadFile, mutationKey, ReisApiError } from "./api";
+import {
+  apiConfiguration,
+  apiRequest,
+  apiUploadFile,
+  mutationKey,
+  ReisApiError,
+} from "./api";
 import LeadsPage from "./Leads";
 import OperationalFlow from "./OperationalFlow";
 
@@ -113,7 +119,17 @@ function apiErrorMessage(reason: unknown, fallback: string) {
 }
 
 function attendancePhoto(attendance: Attendance) {
-  return attendance.foto?.url ?? attendance.fotoUrl;
+  const value = attendance.foto?.url ?? attendance.fotoUrl;
+  if (!value) return undefined;
+  try {
+    const apiBase = new URL(
+      `${apiConfiguration.baseUrl.replace(/\/+$/, "")}/`,
+      window.location.origin,
+    );
+    return new URL(value, apiBase).toString();
+  } catch {
+    return value;
+  }
 }
 
 function AttendancePhoto({
@@ -124,12 +140,30 @@ function AttendancePhoto({
   compact?: boolean;
 }) {
   const url = attendancePhoto(attendance);
-  if (!url)
-    return compact ? (
-      <span className="attendance-photo-empty" title="Sem imagem vinculada">
+  if (compact)
+    return url ? (
+      <a
+        className="attendance-photo-icon has-image"
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        onClick={(event) => event.stopPropagation()}
+        title="Abrir imagem do atendimento"
+        aria-label="Abrir imagem do atendimento"
+      >
+        <Camera size={16} />
+      </a>
+    ) : (
+      <span
+        className="attendance-photo-icon"
+        title="Sem imagem vinculada"
+        aria-label="Sem imagem vinculada"
+      >
         <Camera size={16} />
       </span>
-    ) : (
+    );
+  if (!url)
+    return (
       <div className="attendance-photo-placeholder">
         <Camera size={28} />
         <span>Nenhuma imagem vinculada a este atendimento.</span>
@@ -137,7 +171,7 @@ function AttendancePhoto({
     );
   return (
     <a
-      className={compact ? "attendance-photo-thumb" : "attendance-photo-view"}
+      className="attendance-photo-view"
       href={url}
       target="_blank"
       rel="noreferrer"
@@ -149,7 +183,7 @@ function AttendancePhoto({
         alt={`Imagem do atendimento de ${attendance.cliente?.nome ?? "cliente"}`}
         loading="lazy"
       />
-      {!compact && <span>Abrir imagem original</span>}
+      <span>Abrir imagem original</span>
     </a>
   );
 }
@@ -424,27 +458,37 @@ export default function AttendancesPage({
               <tbody>
                 {filtered.map((item) => (
                   <tr key={item.id} onClick={() => void openAttendance(item)}>
-                    <td>
+                    <td data-label="Data" className="attendance-date">
                       {item.createdAt
                         ? new Date(item.createdAt).toLocaleDateString("pt-BR")
                         : "—"}
                     </td>
-                    <td>{item.cliente?.nome ?? "Não informado"}</td>
-                    <td>{item.empreendimento?.nome ?? "Não informado"}</td>
-                    <td>{item.tipoAtendimento?.nome ?? "Não informado"}</td>
-                    <td>{item.responsavel?.nome ?? "Não informado"}</td>
-                    <td>{item.cic?.nome ?? "Não informado"}</td>
-                    <td>
+                    <td data-label="Cliente" className="attendance-client">
+                      <strong>{item.cliente?.nome ?? "Não informado"}</strong>
+                    </td>
+                    <td data-label="Empreendimento">
+                      {item.empreendimento?.nome ?? "Não informado"}
+                    </td>
+                    <td data-label="Tipo">
+                      {item.tipoAtendimento?.nome ?? "Não informado"}
+                    </td>
+                    <td data-label="Responsável">
+                      {item.responsavel?.nome ?? "Não informado"}
+                    </td>
+                    <td data-label="CIC">
+                      {item.cic?.nome ?? "Não informado"}
+                    </td>
+                    <td data-label="Valor" className="attendance-value">
                       {item.valorNegociacao === undefined
                         ? "—"
                         : money(item.valorNegociacao)}
                     </td>
-                    <td>
+                    <td data-label="Status" className="attendance-status">
                       <span className="status-chip">
                         {item.status ?? "aberto"}
                       </span>
                     </td>
-                    <td>
+                    <td data-label="Imagem" className="attendance-image">
                       <AttendancePhoto attendance={item} compact />
                     </td>
                   </tr>
@@ -665,6 +709,7 @@ function AttendanceForm({
     googleSync: false,
   });
   const [photo, setPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState("");
   const [saving, setSaving] = useState(false);
   const [createdAttendanceId, setCreatedAttendanceId] = useState("");
   const [error, setError] = useState("");
@@ -673,6 +718,15 @@ function AttendanceForm({
   const selectedType = catalogs.tiposAtendimento.find(
     (item) => item.id === values.typeId,
   );
+  useEffect(() => {
+    if (!photo) {
+      setPhotoPreview("");
+      return;
+    }
+    const previewUrl = URL.createObjectURL(photo);
+    setPhotoPreview(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [photo]);
   const canAdvance =
     step === 1
       ? Boolean(
@@ -930,6 +984,14 @@ function AttendanceForm({
                   <Camera size={20} />
                   {photo ? photo.name : "Selecionar foto para pré-visualização"}
                 </i>
+                {photoPreview && (
+                  <span className="attendance-photo-preview">
+                    <img
+                      src={photoPreview}
+                      alt="Pré-visualização da foto do atendimento"
+                    />
+                  </span>
+                )}
                 <small>
                   JPEG, PNG ou WebP, com tamanho máximo de 8 MB. A imagem será
                   enviada ao salvar o atendimento.
