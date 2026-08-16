@@ -8,7 +8,7 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-html { background: #0a0a0a; }
+html, body, #root { min-height: 100%; background: var(--page, #0a0a0a); }
 body { margin: 0; min-width: 320px; min-height: 100vh; }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid #c9a40a; outline-offset: 2px; }
 .call-device-settings .gold-button { width: fit-content; }
