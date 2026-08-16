@@ -1,7 +1,7 @@
 {
   "name": "reis-client",
   "productName": "REIS",
-  "version": "0.1.28",
+  "version": "0.1.29",
   "private": true,
   "description": "Cliente web e desktop seguro da plataforma REIS",
   "author": "Kisori Tech",
