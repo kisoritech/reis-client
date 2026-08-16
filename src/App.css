@@ -454,7 +454,10 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
 .summary-list strong { color: var(--text); font-size: 20px; }
 .wide-panel { grid-column: 1 / -1; }
 .report-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 19px; }
+.report-heading { align-items: flex-end; gap: 14px 24px; }
+.report-heading > div:first-child { flex: 1 1 420px; min-width: 0; }
 .report-actions { display: flex; align-items: center; gap: 10px; }
+.report-heading .report-actions { flex: 0 1 auto; flex-wrap: wrap; }
 .report-actions button { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
 .excel-button { color: var(--success); border-color: rgba(0,232,121,.35); }
 .report-actions button:disabled { opacity: .55; cursor: wait; }
