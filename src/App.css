@@ -804,6 +804,10 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
 .attendance-photo-view img { width: 100%; max-height: 420px; display: block; object-fit: contain; }
 .attendance-photo-view span { position: absolute; right: 10px; bottom: 10px; padding: 6px 9px; border-radius: 8px; color: var(--text); background: rgba(0,0,0,.76); font-size: 11px; }
 .attendance-photo-placeholder { min-height: 150px; display: grid; place-items: center; align-content: center; gap: 9px; border: 1px dashed var(--border); border-radius: 14px; color: var(--muted); background: var(--surface-soft); text-align: center; }
+.attendance-photo-upload { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.attendance-photo-upload label { cursor: pointer; }
+.attendance-photo-upload input { display: none; }
+.attendance-photo-section > small { color: var(--muted); }
 .back-link { margin-bottom: 12px; padding: 0; display: flex; align-items: center; gap: 7px; border: 0; color: var(--gold); background: none; cursor: pointer; }
 .attendance-steps { max-width: 980px; margin: 0 auto 22px; display: grid; grid-template-columns: repeat(3, 1fr); }
 .attendance-steps > div { position: relative; display: flex; align-items: center; gap: 10px; color: var(--muted); }

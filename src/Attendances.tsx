@@ -472,6 +472,7 @@ function AttendanceDetails({
 }) {
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
+  const [photo, setPhoto] = useState<File | null>(null);
   const updateStatus = async (status: "aberto" | "concluido" | "cancelado") => {
     setWorking(true);
     setError("");
@@ -487,6 +488,22 @@ function AttendanceDetails({
       setError(
         apiErrorMessage(reason, "Não foi possível atualizar o atendimento"),
       );
+      setWorking(false);
+    }
+  };
+  const uploadPhoto = async () => {
+    if (!photo) return;
+    setWorking(true);
+    setError("");
+    try {
+      await apiUploadFile(
+        `/crm/atendimentos/${attendance.id}/foto/upload`,
+        photo,
+      );
+      setPhoto(null);
+      onChanged();
+    } catch (reason) {
+      setError(apiErrorMessage(reason, "Não foi possível enviar a imagem"));
       setWorking(false);
     }
   };
@@ -546,6 +563,33 @@ function AttendanceDetails({
         <section className="attendance-photo-section">
           <strong>Imagem vinculada ao atendimento</strong>
           <AttendancePhoto attendance={attendance} />
+          <div className="attendance-photo-upload">
+            <label className="outline-button">
+              <Camera size={16} />
+              {photo
+                ? photo.name
+                : attendancePhoto(attendance)
+                  ? "Substituir imagem"
+                  : "Adicionar imagem"}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                disabled={working}
+                onChange={(event) => setPhoto(event.target.files?.[0] ?? null)}
+              />
+            </label>
+            {photo && (
+              <button
+                type="button"
+                className="gold-button"
+                disabled={working}
+                onClick={() => void uploadPhoto()}
+              >
+                {working ? "Enviando…" : "Enviar imagem"}
+              </button>
+            )}
+          </div>
+          <small>JPEG, PNG ou WebP, com tamanho máximo de 8 MB.</small>
         </section>
         {error && <div className="form-error">{error}</div>}
         <div className="dialog-actions">
