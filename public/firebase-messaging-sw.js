@@ -12,7 +12,7 @@ self.addEventListener("push", (event) => {
         : "reis-notification",
       data: {
         url: data.callRequestId
-          ? `/?callRequest=${encodeURIComponent(data.callRequestId)}`
+          ? `/?callRequest=${encodeURIComponent(data.callRequestId)}&autoDial=1`
           : "/",
       },
     }),
