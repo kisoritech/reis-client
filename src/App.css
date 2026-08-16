@@ -397,10 +397,11 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
 .clients-list > button small { overflow: hidden; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
 .clients-list > button > b { min-width: 28px; padding: 5px; border-radius: 99px; color: var(--gold-bright); background: var(--gold-dark); font-size: 11px; text-align: center; }
 .client-history-panel { overflow: hidden; }
-.client-profile { display: flex; align-items: center; gap: 14px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
+.client-profile { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
 .client-profile > i { width: 54px; height: 54px; flex: 0 0 auto; }
-.client-profile > div { min-width: 0; display: grid; gap: 3px; }
-.client-profile > .client-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.client-profile > div { min-width: 0; flex: 1 1 180px; display: grid; gap: 3px; }
+.client-profile > .client-actions { max-width: 100%; margin-left: auto; flex: 0 0 auto; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.client-actions button { flex: 0 0 auto; white-space: nowrap; }
 .whatsapp-action { color: #25d366; border-color: color-mix(in srgb, #25d366 45%, var(--border)); }
 .client-profile h2 { margin: 0; font-family: var(--display-font); font-size: 25px; }
 .client-profile span, .client-contact-row { color: var(--muted); font-size: 13px; }
@@ -1129,6 +1130,9 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
 }
 
 @media (max-width: 480px) {
+  .client-profile { align-items: flex-start; }
+  .client-profile > .client-actions { width: 100%; margin-left: 0; flex: 1 1 100%; display: grid; grid-template-columns: 1fr; }
+  .client-actions button { width: 100%; min-width: 0; }
   .dashboard-agenda-list > button { grid-template-columns: 44px minmax(0, 1fr); }
   .dashboard-agenda-list > button > .status-chip { display: none; }
   .outcome-ring { width: 150px; }
