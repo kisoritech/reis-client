@@ -20,6 +20,13 @@ export type CallRequest = {
   expiresAt: string;
   createdAt: string;
   dialUri: string;
+  deliveryDetails?: {
+    activeDevices: number;
+    firebaseConfigured: boolean;
+    pushAccepted: number;
+    invalidDevices: number;
+    emailFallback: boolean;
+  };
 };
 
 const firebaseConfig = {

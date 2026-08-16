@@ -206,6 +206,30 @@ export default function ClientsPage({
                   message: "Nenhum celular vinculado recebeu o pedido. Vincule o aparelho em Configurações > Notificações.",
                 },
         );
+        const details = request.deliveryDetails;
+        if (request.delivery !== "push" && request.delivery !== "email") {
+          if (details?.activeDevices === 0) {
+            setCallFeedback({
+              kind: "error",
+              message: "A API não encontrou celular ativo para esta conta. Vincule novamente em Configurações > Notificações.",
+            });
+          } else if (details && !details.firebaseConfigured) {
+            setCallFeedback({
+              kind: "error",
+              message: "O Firebase não está configurado na API publicada no Render.",
+            });
+          } else if (details?.invalidDevices) {
+            setCallFeedback({
+              kind: "error",
+              message: "O Firebase rejeitou o token deste aparelho. Vincule o celular novamente.",
+            });
+          } else if (details) {
+            setCallFeedback({
+              kind: "error",
+              message: "O Firebase não aceitou o push. Consulte o evento call_request_delivery nos logs do Render.",
+            });
+          }
+        }
       }
     } catch (reason) {
       setCallFeedback({
