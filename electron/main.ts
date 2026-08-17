@@ -42,7 +42,7 @@ protocol.registerSchemesAsPrivileged([
 const externalHosts = new Set(
   (
     process.env.REIS_ALLOWED_EXTERNAL_HOSTS ??
-    "localhost,app.seudominio.com,api-reis.onrender.com,accounts.google.com,wa.me"
+    "localhost,app.seudominio.com,api-reis.onrender.com,accounts.google.com,github.com,wa.me"
   )
     .split(",")
     .map((host) => host.trim())
@@ -97,6 +97,22 @@ function registerIpc(): void {
       throw new Error("URL externa não permitida");
     }
     await shell.openExternal(value);
+  });
+  handle("system:open-user-manual", async () => {
+    const manualName = "Manual_Completo_de_Uso_REIS_Client_v1.pdf";
+    if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+      await shell.openExternal(
+        new URL(manualName, MAIN_WINDOW_VITE_DEV_SERVER_URL).toString(),
+      );
+      return;
+    }
+    const manualPath = join(
+      __dirname,
+      `../renderer/${MAIN_WINDOW_VITE_NAME}`,
+      manualName,
+    );
+    const error = await shell.openPath(manualPath);
+    if (error) throw new Error(error);
   });
 }
 

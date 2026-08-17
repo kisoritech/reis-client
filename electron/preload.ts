@@ -15,6 +15,7 @@ const bridge: ReisDesktopBridge = {
     platform: () => ipcRenderer.invoke("system:platform"),
     appVersion: () => ipcRenderer.invoke("system:version"),
     openExternal: (url) => ipcRenderer.invoke("system:open-external", url),
+    openUserManual: () => ipcRenderer.invoke("system:open-user-manual"),
   },
   deepLinks: {
     subscribe: (callback) => {

@@ -2,9 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import {
   Bell,
+  CircleCheck,
   CircleHelp,
   Database,
+  ExternalLink,
   Globe2,
+  GitBranch,
   HelpCircle,
   LockKeyhole,
   Mail,
@@ -150,6 +153,18 @@ function Message({
 async function openExternal(url: string) {
   if (window.reisDesktop) await window.reisDesktop.system.openExternal(url);
   else window.open(url, "_blank", "noopener,noreferrer");
+}
+
+async function openUserManual() {
+  if (window.reisDesktop) {
+    await window.reisDesktop.system.openUserManual();
+    return;
+  }
+  window.open(
+    `${import.meta.env.BASE_URL}Manual_Completo_de_Uso_REIS_Client_v1.pdf`,
+    "_blank",
+    "noopener,noreferrer",
+  );
 }
 
 export default function Settings({
@@ -1999,12 +2014,13 @@ function LocaleSettings({
 }
 
 function HelpSettings() {
+  const [showVersion, setShowVersion] = useState(false);
   const actions = [
     {
       title: "Central de Ajuda",
-      detail: "Documentação da API e tutoriais",
+      detail: "Manual completo de uso do REIS Client",
       icon: HelpCircle,
-      action: () => openExternal("https://api-reis.onrender.com/api/docs"),
+      action: openUserManual,
     },
     {
       title: "Falar com o Suporte",
@@ -2018,8 +2034,9 @@ function HelpSettings() {
     },
     {
       title: "Notas de Versão",
-      detail: "Versão atual da aplicação",
+      detail: "Consulte a versão atual do REIS",
       icon: Star,
+      action: () => setShowVersion((visible) => !visible),
     },
   ];
   return (
@@ -2046,6 +2063,44 @@ function HelpSettings() {
           </button>
         ))}
       </div>
+      {showVersion && (
+        <section className="release-panel" aria-labelledby="release-title">
+          <div className="release-panel-icon" aria-hidden="true">
+            <Star size={24} />
+          </div>
+          <div className="release-panel-content">
+            <div className="release-panel-heading">
+              <div>
+                <span className="release-eyebrow">Versão atual</span>
+                <h3 id="release-title">REIS Client v0.1.32</h3>
+              </div>
+              <span className="release-status">
+                <CircleCheck size={15} /> Estável
+              </span>
+            </div>
+            <p>
+              Esta é a versão apresentada na branch principal do repositório
+              oficial no GitHub.
+            </p>
+            <div className="release-meta">
+              <span>
+                <GitBranch size={16} /> kisoritech/reis-client
+              </span>
+              <button
+                type="button"
+                className="release-link"
+                onClick={() =>
+                  openExternal(
+                    "https://github.com/kisoritech/reis-client/blob/main/package.json",
+                  )
+                }
+              >
+                Ver no GitHub <ExternalLink size={14} />
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

@@ -62,6 +62,7 @@ export type ReisDesktopBridge = {
     >;
     appVersion(): Promise<string>;
     openExternal(url: string): Promise<void>;
+    openUserManual(): Promise<void>;
   };
   deepLinks: {
     subscribe(callback: (path: string) => void): () => void;
