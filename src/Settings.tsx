@@ -2072,7 +2072,7 @@ function HelpSettings() {
             <div className="release-panel-heading">
               <div>
                 <span className="release-eyebrow">Versão atual</span>
-                <h3 id="release-title">REIS Client v0.1.32</h3>
+                <h3 id="release-title">REIS Client v{__APP_VERSION__}</h3>
               </div>
               <span className="release-status">
                 <CircleCheck size={15} /> Estável
