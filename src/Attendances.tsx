@@ -1,13 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import {
   ArrowLeft,
   ArrowRight,
   Camera,
   Check,
+  Download,
+  FileSpreadsheet,
   Plus,
   RefreshCw,
   Search,
+  Upload,
+  X,
 } from "lucide-react";
 import type { PublicSession } from "../electron/contracts";
 import {
@@ -75,6 +79,61 @@ type AttendanceList = {
   total: number;
   totalPages: number;
 };
+
+type AttendanceImportBody = {
+  sourceRow: number;
+  clienteNome: string;
+  clienteTelefone: string;
+  clienteEmail?: string;
+  periodoId?: string;
+  tipoAtendimentoId: string;
+  empreendimentoId?: string;
+  statusNegociacaoId?: string;
+  origemId?: string;
+  cicId?: string;
+  cicManualId?: string;
+  responsavelId: string;
+  valorNegociacao?: number;
+  observacoes?: string;
+};
+
+type AttendanceImportRow = {
+  sheetRow: number;
+  clientName: string;
+  phone: string;
+  typeName: string;
+  body?: AttendanceImportBody;
+  errors: string[];
+};
+
+type AttendanceImportJob = {
+  id: string;
+  fileName: string;
+  status: string;
+  totalRows: number;
+  processedRows: number;
+  importedRows: number;
+  failedRows: number;
+  cancelRequested?: boolean;
+  createdAt?: string;
+  failures?: { row: number; error: string }[];
+};
+
+const normalizeLabel = (value: unknown) =>
+  String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+function importCell(row: Record<string, unknown>, aliases: string[]) {
+  const wanted = aliases.map(normalizeLabel);
+  const entry = Object.entries(row).find(([key]) =>
+    wanted.includes(normalizeLabel(key)),
+  );
+  return String(entry?.[1] ?? "").trim();
+}
 
 const emptyCatalogs: Catalogs = {
   tiposAtendimento: [],
@@ -222,6 +281,7 @@ export default function AttendancesPage({
   const [version, setVersion] = useState(0);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Attendance | null>(null);
+  const [showImport, setShowImport] = useState(false);
 
   useEffect(() => {
     let current = true;
@@ -390,13 +450,35 @@ export default function AttendancesPage({
           <h1>Atendimentos</h1>
           <p>{items.length} registros comerciais encontrados.</p>
         </div>
-        <button
-          className="gold-button attendance-create"
-          onClick={() => setMode("form")}
-        >
-          <Plus size={18} /> Novo atendimento
-        </button>
+        <div className="attendance-heading-actions">
+          <button
+            type="button"
+            className="outline-button"
+            onClick={() => setShowImport(true)}
+          >
+            <FileSpreadsheet size={18} /> Importar Excel
+          </button>
+          <button
+            className="gold-button attendance-create"
+            onClick={() => setMode("form")}
+          >
+            <Plus size={18} /> Novo atendimento
+          </button>
+        </div>
       </div>
+      {showImport && (
+        <AttendanceImportDialog
+          catalogs={catalogs}
+          developments={developments}
+          users={users}
+          manualCics={manualCics}
+          session={session}
+          onClose={() => setShowImport(false)}
+          onImported={() => {
+            setVersion((value) => value + 1);
+          }}
+        />
+      )}
       {selected && (
         <AttendanceDetails
           attendance={selected}
@@ -502,6 +584,446 @@ export default function AttendancesPage({
         )}
       </article>
     </section>
+  );
+}
+
+function AttendanceImportDialog({
+  catalogs,
+  developments,
+  users,
+  manualCics,
+  session,
+  onClose,
+  onImported,
+}: {
+  catalogs: Catalogs;
+  developments: Development[];
+  users: User[];
+  manualCics: CicManual[];
+  session: PublicSession;
+  onClose: () => void;
+  onImported: () => void;
+}) {
+  const [fileName, setFileName] = useState("");
+  const [rows, setRows] = useState<AttendanceImportRow[]>([]);
+  const [reading, setReading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [message, setMessage] = useState("");
+  const [job, setJob] = useState<AttendanceImportJob | null>(null);
+  const [history, setHistory] = useState<AttendanceImportJob[]>([]);
+
+  const loadHistory = useCallback(async () => {
+    try {
+      const response = await apiRequest<AttendanceImportJob[]>({
+        method: "GET",
+        path: "/crm/atendimentos/imports",
+      });
+      setHistory(response.data);
+    } catch {
+      // O histórico é complementar e não deve impedir uma nova importação.
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory]);
+
+  useEffect(() => {
+    if (!job || !["queued", "processing"].includes(job.status)) return;
+    const poll = window.setInterval(() => {
+      void apiRequest<AttendanceImportJob>({
+        method: "GET",
+        path: `/crm/atendimentos/imports/${job.id}`,
+      })
+        .then((response) => {
+          setJob(response.data);
+          if (!["queued", "processing"].includes(response.data.status)) {
+            void loadHistory();
+            if (response.data.importedRows > 0) onImported();
+          }
+        })
+        .catch((reason) =>
+          setMessage(apiErrorMessage(reason, "Não foi possível atualizar o progresso.")),
+        );
+    }, 1500);
+    return () => window.clearInterval(poll);
+  }, [job, loadHistory, onImported]);
+
+  const findItem = <T extends { id: string; nome?: string; codigo?: string }>(
+    items: T[],
+    value: string,
+  ) => {
+    const normalized = normalizeLabel(value);
+    return items.find(
+      (item) =>
+        item.id === value ||
+        normalizeLabel(item.nome) === normalized ||
+        normalizeLabel(item.codigo) === normalized,
+    );
+  };
+
+  const downloadTemplate = async () => {
+    const XLSX = await import("xlsx");
+    const sheet = XLSX.utils.json_to_sheet([
+      {
+        "Nome do cliente": "Maria da Silva",
+        Telefone: "65999999999",
+        Email: "maria@exemplo.com",
+        "Tipo de atendimento": catalogs.tiposAtendimento[0]?.nome ?? "Visita",
+        Empreendimento: developments[0]?.nome ?? "",
+        "Status da negociação": catalogs.statusNegociacao[0]?.nome ?? "",
+        Origem: catalogs.origens[0]?.nome ?? "",
+        Período: catalogs.periodos[0]?.nome ?? "",
+        Responsável: session.user.name,
+        CIC: "",
+        "Valor da negociação": 350000,
+        Observações: "Cliente importado por planilha",
+      },
+    ]);
+    sheet["!cols"] = [
+      { wch: 24 },
+      { wch: 16 },
+      { wch: 28 },
+      { wch: 24 },
+      { wch: 24 },
+      { wch: 23 },
+      { wch: 18 },
+      { wch: 16 },
+      { wch: 24 },
+      { wch: 22 },
+      { wch: 22 },
+      { wch: 38 },
+    ];
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book, sheet, "Atendimentos");
+    XLSX.writeFile(book, "modelo-importacao-atendimentos-reis.xlsx");
+  };
+
+  const readFile = async (file: File) => {
+    setReading(true);
+    setMessage("");
+    setRows([]);
+    setFileName(file.name);
+    try {
+      const XLSX = await import("xlsx");
+      const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const source = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+        defval: "",
+      });
+      if (!source.length) throw new Error("A primeira aba da planilha está vazia.");
+      if (source.length > 10000)
+        throw new Error("A planilha pode conter no máximo 10.000 atendimentos.");
+
+      const parsed = source.map((sourceRow, index): AttendanceImportRow => {
+        const clientName = importCell(sourceRow, ["nome do cliente", "cliente"]);
+        const phone = importCell(sourceRow, ["telefone", "celular", "whatsapp"]);
+        const email = importCell(sourceRow, ["email", "e-mail"]);
+        const typeName = importCell(sourceRow, ["tipo de atendimento", "tipo"]);
+        const developmentName = importCell(sourceRow, ["empreendimento"]);
+        const statusName = importCell(sourceRow, [
+          "status da negociacao",
+          "status negociacao",
+        ]);
+        const originName = importCell(sourceRow, ["origem"]);
+        const periodName = importCell(sourceRow, ["periodo"]);
+        const responsibleName = importCell(sourceRow, ["responsavel"]);
+        const cicName = importCell(sourceRow, ["cic"]);
+        const valueText = importCell(sourceRow, [
+          "valor da negociacao",
+          "valor negociacao",
+          "valor",
+        ]);
+        const notes = importCell(sourceRow, ["observacoes", "observacao"]);
+        const errors: string[] = [];
+        const digits = phone.replace(/\D/g, "");
+        const type = findItem(catalogs.tiposAtendimento, typeName);
+        const development = developmentName
+          ? findItem(developments, developmentName)
+          : undefined;
+        const status = statusName
+          ? findItem(catalogs.statusNegociacao, statusName)
+          : undefined;
+        const origin = originName
+          ? findItem(catalogs.origens, originName)
+          : undefined;
+        const period = periodName
+          ? findItem(catalogs.periodos, periodName)
+          : undefined;
+        const responsible = responsibleName
+          ? users.find(
+              (user) =>
+                user.id === responsibleName ||
+                normalizeLabel(user.nome ?? user.name) ===
+                  normalizeLabel(responsibleName) ||
+                normalizeLabel(user.email) === normalizeLabel(responsibleName),
+            )
+          : users.find((user) => user.id === session.user.id) ?? session.user;
+        const userCic = cicName
+          ? users.find(
+              (user) =>
+                user.id === cicName ||
+                normalizeLabel(user.nome ?? user.name) === normalizeLabel(cicName),
+            )
+          : undefined;
+        const manualCic = cicName
+          ? findItem(manualCics, cicName)
+          : undefined;
+        const numericValue = valueText
+          ? Number(
+              valueText
+                .replace(/[^\d,.-]/g, "")
+                .replace(/\.(?=\d{3}(?:\D|$))/g, "")
+                .replace(",", "."),
+            )
+          : undefined;
+
+        if (!clientName) errors.push("Nome do cliente não informado");
+        if (digits.length < 8) errors.push("Telefone inválido");
+        if (!type) errors.push("Tipo de atendimento não encontrado");
+        if (developmentName && !development)
+          errors.push("Empreendimento não encontrado");
+        if (statusName && !status) errors.push("Status não encontrado");
+        if (originName && !origin) errors.push("Origem não encontrada");
+        if (periodName && !period) errors.push("Período não encontrado");
+        if (!responsible) errors.push("Responsável não encontrado");
+        if (cicName && !userCic && !manualCic) errors.push("CIC não encontrado");
+        if (valueText && (!Number.isFinite(numericValue) || Number(numericValue) < 0))
+          errors.push("Valor da negociação inválido");
+
+        return {
+          sheetRow: index + 2,
+          clientName,
+          phone,
+          typeName,
+          errors,
+          body:
+            errors.length || !type || !responsible
+              ? undefined
+              : {
+                  sourceRow: index + 2,
+                  clienteNome: clientName,
+                  clienteTelefone: phone,
+                  clienteEmail: email || undefined,
+                  tipoAtendimentoId: type.id,
+                  empreendimentoId: development?.id,
+                  statusNegociacaoId: status?.id,
+                  origemId: origin?.id,
+                  periodoId: period?.id,
+                  responsavelId: responsible.id,
+                  cicId: userCic?.id,
+                  cicManualId: userCic ? undefined : manualCic?.id,
+                  valorNegociacao: numericValue,
+                  observacoes: notes || undefined,
+                },
+        };
+      });
+      setRows(parsed);
+    } catch (reason) {
+      setMessage(
+        reason instanceof Error ? reason.message : "Não foi possível ler a planilha.",
+      );
+    } finally {
+      setReading(false);
+    }
+  };
+
+  const validRows = rows.filter(
+    (row): row is AttendanceImportRow & { body: AttendanceImportBody } =>
+      Boolean(row.body),
+  );
+  const importRows = async () => {
+    if (!validRows.length) return;
+    setImporting(true);
+    setMessage("");
+    try {
+      const result = await apiRequest<AttendanceImportJob>({
+        method: "POST",
+        path: "/crm/atendimentos/imports",
+        body: {
+          fileName: fileName || "importacao-atendimentos.xlsx",
+          atendimentos: validRows.map((row) => row.body),
+        },
+        idempotencyKey: mutationKey(),
+      });
+      setJob(result.data);
+      setRows([]);
+      void loadHistory();
+    } catch (reason) {
+      setMessage(apiErrorMessage(reason, "Não foi possível importar os atendimentos."));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const updateJob = async (action: "cancel" | "retry") => {
+    if (!job) return;
+    setMessage("");
+    try {
+      const response = await apiRequest<AttendanceImportJob>({
+        method: "POST",
+        path: `/crm/atendimentos/imports/${job.id}/${action}`,
+        body: {},
+        idempotencyKey: mutationKey(),
+      });
+      setJob((current) => ({ ...current!, ...response.data }));
+      void loadHistory();
+    } catch (reason) {
+      setMessage(apiErrorMessage(reason, `Não foi possível ${action === "cancel" ? "cancelar" : "retomar"} a importação.`));
+    }
+  };
+
+  const progress = job
+    ? Math.min(100, Math.round((job.processedRows / job.totalRows) * 100))
+    : 0;
+  const statusLabel: Record<string, string> = {
+    queued: "Na fila",
+    processing: "Processando",
+    completed: "Concluída",
+    completed_with_errors: "Concluída com erros",
+    cancelled: "Cancelada",
+    failed: "Falha operacional",
+  };
+
+  return (
+    <div className="dialog-backdrop" role="presentation">
+      <section
+        className="dialog attendance-import-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="attendance-import-title"
+      >
+        <header className="attendance-import-heading">
+          <div>
+            <span className="release-eyebrow">Importação em lote</span>
+            <h2 id="attendance-import-title">Importar atendimentos do Excel</h2>
+            <p>Revise os registros antes de enviá-los para a API.</p>
+          </div>
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Fechar">
+            <X size={18} />
+          </button>
+        </header>
+        <div className="attendance-import-actions">
+          <button type="button" className="outline-button" onClick={() => void downloadTemplate()}>
+            <Download size={17} /> Baixar modelo
+          </button>
+          <label className="gold-button">
+            <Upload size={17} /> {reading ? "Lendo…" : "Selecionar Excel"}
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              disabled={reading || importing}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void readFile(file);
+                event.target.value = "";
+              }}
+            />
+          </label>
+        </div>
+        {fileName && <p className="attendance-import-file"><FileSpreadsheet size={17} /> {fileName}</p>}
+        {rows.length > 0 && (
+          <>
+            <div className="attendance-import-summary">
+              <span><strong>{rows.length}</strong> linhas</span>
+              <span className="valid"><strong>{validRows.length}</strong> prontas</span>
+              <span className="invalid"><strong>{rows.length - validRows.length}</strong> com erro</span>
+            </div>
+            <div className="attendance-import-preview">
+              <table className="data-table">
+                <thead><tr><th>Linha</th><th>Cliente</th><th>Telefone</th><th>Tipo</th><th>Validação</th></tr></thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr key={row.sheetRow}>
+                      <td>{row.sheetRow}</td>
+                      <td>{row.clientName || "—"}</td>
+                      <td>{row.phone || "—"}</td>
+                      <td>{row.typeName || "—"}</td>
+                      <td className={row.errors.length ? "import-error" : "import-valid"}>
+                        {row.errors.length ? row.errors.join("; ") : "Pronta para importar"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+        {job && (
+          <section className="attendance-import-progress" aria-live="polite">
+            <div className="attendance-import-progress-heading">
+              <div>
+                <span>{statusLabel[job.status] ?? job.status}</span>
+                <strong>{progress}%</strong>
+              </div>
+              <small>{job.fileName}</small>
+            </div>
+            <div className="attendance-import-progress-track">
+              <i style={{ width: `${progress}%` }} />
+            </div>
+            <div className="attendance-import-summary">
+              <span><strong>{job.processedRows}</strong> processadas</span>
+              <span className="valid"><strong>{job.importedRows}</strong> importadas</span>
+              <span className="invalid"><strong>{job.failedRows}</strong> rejeitadas</span>
+            </div>
+            {job.failures && job.failures.length > 0 && (
+              <div className="attendance-import-failures">
+                <strong>Erros encontrados</strong>
+                {job.failures.slice(0, 100).map((failure) => (
+                  <span key={failure.row}>Linha {failure.row}: {failure.error}</span>
+                ))}
+              </div>
+            )}
+            <div className="attendance-import-job-actions">
+              {["queued", "processing"].includes(job.status) && (
+                <button type="button" className="outline-button" onClick={() => void updateJob("cancel")}>
+                  Cancelar processamento
+                </button>
+              )}
+              {["failed", "completed_with_errors", "cancelled"].includes(job.status) && (
+                <button type="button" className="outline-button" onClick={() => void updateJob("retry")}>
+                  Tentar linhas pendentes novamente
+                </button>
+              )}
+            </div>
+          </section>
+        )}
+        {history.length > 0 && (
+          <details className="attendance-import-history">
+            <summary>Histórico de importações ({history.length})</summary>
+            <div>
+              {history.map((item) => (
+                <button
+                  type="button"
+                  key={item.id}
+                  onClick={() =>
+                    void apiRequest<AttendanceImportJob>({
+                      method: "GET",
+                      path: `/crm/atendimentos/imports/${item.id}`,
+                    }).then((response) => setJob(response.data))
+                  }
+                >
+                  <span><strong>{item.fileName}</strong><small>{item.createdAt ? new Date(item.createdAt).toLocaleString("pt-BR") : ""}</small></span>
+                  <span>{statusLabel[item.status] ?? item.status}<small>{item.importedRows}/{item.totalRows} importadas</small></span>
+                </button>
+              ))}
+            </div>
+          </details>
+        )}
+        {message && <div className="settings-message error">{message}</div>}
+        <footer className="dialog-actions">
+          <button type="button" className="outline-button" onClick={onClose}>Cancelar</button>
+          <button
+            type="button"
+            className="gold-button"
+            disabled={!validRows.length || importing || Boolean(job && ["queued", "processing"].includes(job.status))}
+            onClick={() => void importRows()}
+          >
+            {importing ? "Importando…" : `Importar ${validRows.length} atendimentos`}
+          </button>
+        </footer>
+      </section>
+    </div>
   );
 }
 

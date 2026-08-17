@@ -875,6 +875,45 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
 .attendance-photo-upload { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .attendance-photo-upload label { cursor: pointer; }
 .attendance-photo-upload input { display: none; }
+.attendance-heading-actions { display: flex; align-items: center; gap: 10px; }
+.attendance-heading-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.attendance-import-dialog { width: min(980px, 100%); }
+.attendance-import-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.attendance-import-heading h2 { margin: 0 0 6px; }
+.attendance-import-heading p { margin: 0; color: var(--muted); }
+.attendance-import-actions { display: flex; align-items: center; gap: 10px; }
+.attendance-import-actions button, .attendance-import-actions label { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.attendance-import-actions label { cursor: pointer; }
+.attendance-import-actions input { display: none; }
+.attendance-import-file { margin: 0; padding: 11px 13px; display: flex; align-items: center; gap: 8px; border-radius: 10px; color: var(--muted); background: var(--surface-soft); }
+.attendance-import-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.attendance-import-summary span { padding: 13px; display: grid; gap: 3px; border: 1px solid var(--border); border-radius: 12px; color: var(--muted); font-size: 12px; }
+.attendance-import-summary strong { color: var(--text); font-size: 20px; }
+.attendance-import-summary .valid strong, .import-valid { color: var(--success); }
+.attendance-import-summary .invalid strong, .import-error { color: var(--danger-text); }
+.attendance-import-preview { max-height: 330px; overflow: auto; border: 1px solid var(--border); border-radius: 12px; }
+.attendance-import-preview table { min-width: 780px; }
+.attendance-import-preview th { position: sticky; z-index: 1; top: 0; background: var(--surface); }
+.attendance-import-preview td { height: auto; min-height: 52px; }
+.attendance-import-preview .import-error { max-width: 300px; font-size: 12px; line-height: 1.4; }
+.attendance-import-progress { padding: 18px; display: grid; gap: 14px; border: 1px solid rgba(209,167,15,.35); border-radius: 14px; background: rgba(209,167,15,.045); }
+.attendance-import-progress-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.attendance-import-progress-heading > div { display: flex; align-items: baseline; gap: 10px; }
+.attendance-import-progress-heading span { color: var(--gold-bright); font-weight: 600; }
+.attendance-import-progress-heading strong { font-size: 22px; }
+.attendance-import-progress-heading small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attendance-import-progress-track { height: 9px; overflow: hidden; border-radius: 99px; background: var(--surface-soft); }
+.attendance-import-progress-track i { height: 100%; display: block; border-radius: inherit; background: linear-gradient(90deg, var(--gold), var(--gold-bright)); transition: width .3s ease; }
+.attendance-import-failures { max-height: 180px; padding: 12px; display: grid; gap: 6px; overflow-y: auto; border-radius: 10px; color: var(--danger-text); background: var(--danger-bg); font-size: 12px; }
+.attendance-import-job-actions { display: flex; justify-content: flex-end; }
+.attendance-import-history { border-top: 1px solid var(--border); }
+.attendance-import-history summary { padding: 13px 0; color: var(--muted); cursor: pointer; }
+.attendance-import-history > div { max-height: 230px; display: grid; gap: 7px; overflow-y: auto; }
+.attendance-import-history button { padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 14px; border: 1px solid var(--border); border-radius: 10px; color: var(--text); background: transparent; text-align: left; cursor: pointer; }
+.attendance-import-history button:hover { border-color: var(--gold); }
+.attendance-import-history button span { display: grid; gap: 3px; }
+.attendance-import-history button span:last-child { text-align: right; }
+.attendance-import-history small { color: var(--muted); }
 .attendance-photo-section > small { color: var(--muted); }
 .back-link { margin-bottom: 12px; padding: 0; display: flex; align-items: center; gap: 7px; border: 0; color: var(--gold); background: none; cursor: pointer; }
 .attendance-steps { max-width: 980px; margin: 0 auto 22px; display: grid; grid-template-columns: repeat(3, 1fr); }
@@ -1142,6 +1181,11 @@ main { padding: 35px; max-width: 1650px; margin: 0 auto; }
   .dialog-backdrop { place-items: start center; padding: 12px; }
   .dialog { width: 100%; max-height: calc(100dvh - 24px); padding: 22px 16px; border-radius: 16px; }
   .dialog-actions, .attendance-form-actions { flex-wrap: wrap; }
+  .attendance-heading-actions, .attendance-import-actions { width: 100%; align-items: stretch; flex-direction: column; }
+  .attendance-heading-actions button, .attendance-import-actions button, .attendance-import-actions label { width: 100%; }
+  .attendance-import-summary { grid-template-columns: 1fr; }
+  .attendance-import-progress-heading, .attendance-import-history button { align-items: flex-start; flex-direction: column; }
+  .attendance-import-history button span:last-child { text-align: left; }
   .dialog-actions button, .attendance-form-actions button { flex: 1 1 150px; justify-content: center; }
 }
 
