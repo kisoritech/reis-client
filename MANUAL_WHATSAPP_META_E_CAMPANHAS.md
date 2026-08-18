@@ -57,7 +57,7 @@ WHATSAPP_WEBHOOK_VERIFY_TOKEN=<valor aleatório exclusivo>
 Publique uma URL HTTPS, por exemplo:
 
 ```text
-https://api-reis.onrender.com/api/v1/integrations/meta/webhook
+https://api-reis-jj7i9nbql-kisoritechs-projects.vercel.app/api/v1/integrations/meta/webhook
 ```
 
 No painel WhatsApp > Configuração:
@@ -149,4 +149,3 @@ Aceitar opt-out por `SAIR`, `PARAR`, `CANCELAR`, atendimento humano e outros can
 | Webhook não chega | HTTPS, assinatura, assinatura de campos e resposta 200 |
 | Duplicidade | chave idempotente e deduplicação pelo message ID |
 | Queda de qualidade | frequência, segmentação, reclamações e opt-out |
-

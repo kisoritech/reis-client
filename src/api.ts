@@ -57,7 +57,7 @@ const API_BASE = (
     ? "/api/v1"
     : (import.meta.env.VITE_API_BASE_URL ??
       import.meta.env.VITE_REIS_API_URL ??
-      "https://api-reis.onrender.com/api/v1")
+      "https://api-reis-jj7i9nbql-kisoritechs-projects.vercel.app/api/v1")
 ).replace(/\/+$/, "");
 const STORAGE_KEY = "reis.web.session";
 let refreshPromise: Promise<boolean> | null = null;
