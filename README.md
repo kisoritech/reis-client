@@ -261,7 +261,7 @@ Release correspondente ao sistema operacional.
 Use `.env.example` como referência:
 
 ```env
-REIS_API_URL=https://api-reis-jj7i9nbql-kisoritechs-projects.vercel.app/api/v1
+REIS_API_URL=https://api-reis.vercel.app/api/v1
 REIS_WEB_URL=http://localhost:5173
 REIS_ALLOWED_EXTERNAL_HOSTS=localhost,app.seudominio.com,accounts.google.com
 ```

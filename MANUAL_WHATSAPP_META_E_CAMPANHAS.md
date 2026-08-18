@@ -57,7 +57,7 @@ WHATSAPP_WEBHOOK_VERIFY_TOKEN=<valor aleatório exclusivo>
 Publique uma URL HTTPS, por exemplo:
 
 ```text
-https://api-reis-jj7i9nbql-kisoritechs-projects.vercel.app/api/v1/integrations/meta/webhook
+https://api-reis.vercel.app/api/v1/integrations/meta/webhook
 ```
 
 No painel WhatsApp > Configuração:

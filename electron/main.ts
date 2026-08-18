@@ -42,7 +42,7 @@ protocol.registerSchemesAsPrivileged([
 const externalHosts = new Set(
   (
     process.env.REIS_ALLOWED_EXTERNAL_HOSTS ??
-    "localhost,app.seudominio.com,api-reis-jj7i9nbql-kisoritechs-projects.vercel.app,accounts.google.com,github.com,wa.me"
+    "localhost,app.seudominio.com,api-reis.vercel.app,accounts.google.com,github.com,wa.me"
   )
     .split(",")
     .map((host) => host.trim())
